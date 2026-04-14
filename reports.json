@@ -1,5 +1,17 @@
 [
   {
+    "ticker": "PLTR",
+    "company": "Palantir Technologies Inc. · NASDAQ",
+    "date": "2026-04-14",
+    "time": "20:39",
+    "price": "$135.39",
+    "change": "▼ 23.8% YTD",
+    "changeDir": "neg",
+    "riskScore": 62,
+    "verdict": "HOLD — ELEVATED RISK",
+    "file": "reports/PLTR_2026-04-14T2039.html"
+  },
+  {
     "ticker": "TSLA",
     "company": "Tesla, Inc. · NASDAQ",
     "date": "2026-04-14",
