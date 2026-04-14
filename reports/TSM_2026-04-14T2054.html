@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TSM Risk Score Report — April 2026</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#08090d;--surface:#0e1017;--surface2:#141720;--surface3:#1a1e2a;
+    --border:#1e2330;--border-light:#2a3040;
+    --text:#e8eaf0;--text-dim:#8890a4;--text-muted:#565e74;
+    --green:#00e676;--green-dim:#00e67620;--green-bg:#0a2618;
+    --red:#ff5252;--red-dim:#ff525220;--red-bg:#2a0e0e;
+    --amber:#ffab40;--amber-dim:#ffab4020;--amber-bg:#2a1e0a;
+    --blue:#448aff;--blue-dim:#448aff20;
+    --cyan:#18ffff;
+    --mono:'JetBrains Mono',monospace;
+    --sans:'DM Sans',sans-serif;
+    --page-w:1080px;
+  }
+  html{font-size:14px}
+  body{background:var(--bg);color:var(--text);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
+
+  .page{max-width:var(--page-w);margin:0 auto;padding:48px 40px;min-height:100vh;position:relative}
+  .page+.page{border-top:1px solid var(--border)}
+  .page::before{content:'';position:absolute;top:0;left:0;right:0;height:260px;background:linear-gradient(180deg,#448aff08 0%,transparent 100%);pointer-events:none}
+
+  @media print{.page{page-break-before:always;padding:24px}}
+
+  .stock-bar{display:flex;align-items:center;gap:20px;padding:16px 24px;background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:32px;position:relative;overflow:hidden}
+  .stock-bar::after{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--blue),transparent)}
+  .stock-bar .ticker{font-family:var(--mono);font-size:1.7rem;font-weight:700;letter-spacing:-.02em;color:var(--text)}
+  .stock-bar .company{font-size:.95rem;color:var(--text-dim);margin-left:-8px}
+  .stock-bar .price-block{margin-left:auto;text-align:right}
+  .stock-bar .price{font-family:var(--mono);font-size:1.6rem;font-weight:600}
+  .stock-bar .change{font-family:var(--mono);font-size:.85rem;padding:3px 10px;border-radius:6px;display:inline-block;margin-top:2px}
+  .stock-bar .change.neg{color:var(--red);background:var(--red-dim)}
+  .stock-bar .change.pos{color:var(--green);background:var(--green-dim)}
+  .stock-bar .meta{font-family:var(--mono);font-size:.75rem;color:var(--text-muted);display:flex;flex-direction:column;gap:2px;min-width:160px}
+  .stock-bar .dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);animation:pulse 2s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+  .gauge-row{display:flex;align-items:center;gap:40px;margin-bottom:36px}
+  .gauge-wrap{width:220px;flex-shrink:0;position:relative}
+  .gauge-wrap svg{width:100%;display:block}
+  .gauge-label{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);text-align:center}
+  .gauge-label .num{font-family:var(--mono);font-size:2.8rem;font-weight:700;line-height:1;color:var(--cyan)}
+  .gauge-label .sub{font-size:.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.12em;margin-top:2px}
+  .score-desc{flex:1}
+  .score-desc h2{font-size:1.1rem;font-weight:600;margin-bottom:6px;color:var(--cyan)}
+  .score-desc p{font-size:.88rem;color:var(--text-dim);line-height:1.6;max-width:520px}
+
+  .kpi-strip{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:36px}
+  .kpi{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;position:relative;overflow:hidden}
+  .kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+  .kpi.g::before{background:var(--green)}.kpi.r::before{background:var(--red)}.kpi.a::before{background:var(--amber)}.kpi.b::before{background:var(--blue)}
+  .kpi .label{font-size:.65rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);margin-bottom:6px}
+  .kpi .val{font-family:var(--mono);font-size:1.15rem;font-weight:600}
+  .kpi .sub{font-family:var(--mono);font-size:.7rem;color:var(--text-muted);margin-top:2px}
+
+  .chart-section{margin-bottom:36px}
+  .chart-section h3{font-size:.75rem;text-transform:uppercase;letter-spacing:.12em;color:var(--text-muted);margin-bottom:12px}
+  .chart-box{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px 24px 16px;position:relative;overflow:hidden}
+  .chart-box svg{width:100%;display:block}
+
+  .card-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:36px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px 20px;position:relative;overflow:hidden}
+  .card::before{content:'';position:absolute;top:0;left:0;width:3px;height:100%;border-radius:0 3px 3px 0}
+  .card.green::before{background:var(--green)}.card.red::before{background:var(--red)}.card.amber::before{background:var(--amber)}
+  .card .card-title{font-size:.7rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);margin-bottom:10px;display:flex;align-items:center;gap:8px}
+  .card .card-title .dot-ind{width:6px;height:6px;border-radius:50%}
+  .card.green .dot-ind{background:var(--green)}.card.red .dot-ind{background:var(--red)}.card.amber .dot-ind{background:var(--amber)}
+  .card ul{list-style:none;padding:0}
+  .card li{font-size:.82rem;color:var(--text-dim);padding:4px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+  .card li:last-child{border:none}
+  .card li .v{font-family:var(--mono);font-weight:500;font-size:.8rem}
+  .card li .v.g{color:var(--green)}.card li .v.r{color:var(--red)}.card li .v.a{color:var(--amber)}
+
+  .breakdown{margin-bottom:16px}
+  .breakdown h3{font-size:.75rem;text-transform:uppercase;letter-spacing:.12em;color:var(--text-muted);margin-bottom:14px}
+  .bar-row{display:flex;align-items:center;gap:14px;margin-bottom:10px}
+  .bar-row .bar-label{font-size:.8rem;color:var(--text-dim);width:140px;flex-shrink:0}
+  .bar-row .bar-track{flex:1;height:10px;background:var(--surface2);border-radius:5px;overflow:hidden;position:relative}
+  .bar-row .bar-fill{height:100%;border-radius:5px;position:relative}
+  .bar-row .bar-fill::after{content:'';position:absolute;top:0;right:0;bottom:0;width:40%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.12))}
+  .bar-row .bar-num{font-family:var(--mono);font-size:.8rem;font-weight:600;width:60px;text-align:right;flex-shrink:0}
+
+  .qtable{width:100%;border-collapse:collapse;margin-bottom:36px;font-size:.82rem}
+  .qtable th{font-size:.65rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);font-weight:500;padding:10px 12px;text-align:right;border-bottom:1px solid var(--border-light)}
+  .qtable th:first-child{text-align:left}
+  .qtable td{font-family:var(--mono);font-weight:400;padding:10px 12px;text-align:right;border-bottom:1px solid var(--border);color:var(--text-dim)}
+  .qtable td:first-child{font-family:var(--sans);color:var(--text);text-align:left;font-weight:500}
+  .qtable tr:hover td{background:var(--surface)}
+  .qtable .highlight td{background:var(--surface2);color:var(--text)}
+
+  .dual{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:36px}
+  .dual-col{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px 22px}
+  .dual-col h4{font-size:.7rem;text-transform:uppercase;letter-spacing:.12em;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+  .dual-col h4 .ic{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.65rem}
+  .dual-col.catalysts h4{color:var(--green)}.dual-col.catalysts h4 .ic{background:var(--green-dim);color:var(--green)}
+  .dual-col.risks h4{color:var(--red)}.dual-col.risks h4 .ic{background:var(--red-dim);color:var(--red)}
+  .dual-col li{font-size:.82rem;color:var(--text-dim);padding:6px 0;border-bottom:1px solid var(--border);line-height:1.5}
+  .dual-col li:last-child{border:none}
+  .dual-col ul{list-style:none;padding:0}
+
+  .earnings-box{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px 24px;margin-bottom:36px}
+  .earnings-box h4{font-size:.7rem;text-transform:uppercase;letter-spacing:.12em;color:var(--text-muted);margin-bottom:10px}
+  .earnings-box p{font-size:.88rem;color:var(--text-dim);line-height:1.65}
+  .earnings-box .highlight-date{font-family:var(--mono);color:var(--cyan);font-weight:500}
+
+  .bottom-line{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px 28px;position:relative;overflow:hidden}
+  .bottom-line::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--red),var(--amber),var(--green))}
+  .bottom-line h3{font-size:.95rem;font-weight:600;margin-bottom:8px;color:var(--text)}
+  .bottom-line p{font-size:.88rem;color:var(--text-dim);line-height:1.65;margin-bottom:16px}
+  .rating-bar{display:flex;align-items:center;gap:16px;margin-top:14px}
+  .rating-bar .segments{display:flex;gap:3px;flex:1}
+  .rating-bar .seg{height:8px;flex:1;border-radius:4px;background:var(--surface2)}
+  .rating-bar .seg.active-r{background:var(--red)}.rating-bar .seg.active-a{background:var(--amber)}.rating-bar .seg.active-g{background:var(--green)}
+  .rating-bar .verdict{font-family:var(--mono);font-size:.95rem;font-weight:700;color:var(--green);white-space:nowrap}
+  .rating-labels{display:flex;justify-content:space-between;margin-top:6px;font-size:.6rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted)}
+
+  .copy-btn{position:fixed;bottom:24px;right:24px;background:var(--surface2);border:1px solid var(--border-light);color:var(--text-dim);font-family:var(--mono);font-size:.75rem;padding:10px 18px;border-radius:8px;cursor:pointer;z-index:100;transition:all .2s}
+  .copy-btn:hover{background:var(--blue);color:#fff;border-color:var(--blue)}
+
+  .section-title{font-size:.75rem;text-transform:uppercase;letter-spacing:.12em;color:var(--text-muted);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+
+  .report-footer{text-align:center;padding:20px 0 0;font-size:.65rem;color:var(--text-muted);border-top:1px solid var(--border);margin-top:32px}
+
+  .analysis-ts-only{font-family:var(--mono);font-size:.7rem;color:var(--text-muted);letter-spacing:.04em;text-align:right;margin-bottom:14px}
+
+  @media(max-width:800px){
+    .kpi-strip{grid-template-columns:repeat(3,1fr)}
+    .card-grid{grid-template-columns:1fr}
+    .dual{grid-template-columns:1fr}
+    .stock-bar{flex-wrap:wrap}
+    .gauge-row{flex-direction:column;align-items:flex-start}
+  }
+</style>
+</head>
+<body>
+
+<!-- ========== PAGE 1 ========== -->
+<div class="page" id="page1">
+
+  <div class="analysis-ts-only">April 14, 2026 — 20:54 CET</div>
+
+  <div class="stock-bar">
+    <div class="dot"></div>
+    <div>
+      <div class="ticker">TSM</div>
+      <div class="company">Taiwan Semiconductor Mfg. Co., Ltd. (TSMC) &middot; NYSE ADR</div>
+    </div>
+    <div class="meta">
+      <span>Mkt Cap <b style="color:var(--text)">~$1.66T</b></span>
+      <span>52w <b style="color:var(--text)">$134.25 – $390.21</b></span>
+      <span>Vol (20d avg) <b style="color:var(--text)">~14.2M</b></span>
+    </div>
+    <div class="price-block">
+      <div class="price">$380.64</div>
+      <div class="change pos">▲ ~21% YTD</div>
+    </div>
+  </div>
+
+  <div class="gauge-row">
+    <div class="gauge-wrap">
+      <svg viewBox="0 0 200 120" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="gaugeBg" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#1a1e2a"/>
+            <stop offset="100%" stop-color="#1a1e2a"/>
+          </linearGradient>
+          <linearGradient id="gaugeGrad" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#00e676"/>
+            <stop offset="40%" stop-color="#ffab40"/>
+            <stop offset="100%" stop-color="#ff5252"/>
+          </linearGradient>
+        </defs>
+        <path d="M 20 105 A 80 80 0 0 1 180 105" fill="none" stroke="url(#gaugeBg)" stroke-width="12" stroke-linecap="round"/>
+        <!-- 44/100 of semicircle arc ≈ dashoffset 140 (arc length ~251) -->
+        <path d="M 20 105 A 80 80 0 0 1 180 105" fill="none" stroke="url(#gaugeGrad)" stroke-width="12" stroke-linecap="round" stroke-dasharray="251" stroke-dashoffset="140" opacity=".9"/>
+        <text x="14" y="115" font-family="JetBrains Mono" font-size="8" fill="#565e74">0</text>
+        <text x="93" y="20" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">50</text>
+        <text x="178" y="115" font-family="JetBrains Mono" font-size="8" fill="#565e74">100</text>
+        <circle cx="85" cy="27" r="4" fill="#18ffff" opacity=".95"/>
+      </svg>
+      <div class="gauge-label">
+        <div class="num">44</div>
+        <div class="sub">Risk Score</div>
+      </div>
+    </div>
+    <div class="score-desc">
+      <h2>Moderate Risk — Quality Compounder, Geopolitical Overhang</h2>
+      <p>TSMC screens fundamentally elite: leading-edge share, ~60%+ gross margins, and multi-year AI/HPC demand. Multiples are full versus history (trailing P/E ~32×) and 2026 capex is massive ($52–56B guided), amplifying cycle sensitivity. The dominant incremental risk is geopolitical — Taiwan Strait tensions and export-control friction — which can overwhelm fair value in a stress scenario.</p>
+    </div>
+  </div>
+
+  <div class="kpi-strip">
+    <div class="kpi a">
+      <div class="label">P/E (TTM)</div>
+      <div class="val" style="color:var(--amber)">~32×</div>
+      <div class="sub">Fwd ~23–27×</div>
+    </div>
+    <div class="kpi g">
+      <div class="label">Q1'26 Revenue</div>
+      <div class="val" style="color:var(--green)">~$35.6B</div>
+      <div class="sub">~+35% YoY</div>
+    </div>
+    <div class="kpi g">
+      <div class="label">Gross Margin (Q4'25)</div>
+      <div class="val" style="color:var(--green)">62.3%</div>
+      <div class="sub">Op margin 54.0%</div>
+    </div>
+    <div class="kpi g">
+      <div class="label">Adv. Nodes (≤7nm)</div>
+      <div class="val" style="color:var(--green)">77%</div>
+      <div class="sub">wafer rev mix Q4'25</div>
+    </div>
+    <div class="kpi g">
+      <div class="label">Net Cash Profile</div>
+      <div class="val" style="color:var(--green)">Fortress</div>
+      <div class="sub">High ROIC / FCF</div>
+    </div>
+    <div class="kpi b">
+      <div class="label">Next Catalyst</div>
+      <div class="val" style="color:var(--cyan)">Q2'26 guide</div>
+      <div class="sub">Tech day / CoWoS</div>
+    </div>
+  </div>
+
+  <div class="chart-section">
+    <h3>12-Month Price Action &middot; TSM (ADR)</h3>
+    <div class="chart-box">
+      <svg viewBox="0 0 1000 300" xmlns="http://www.w3.org/2000/svg" style="overflow:visible">
+        <defs>
+          <linearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#448aff" stop-opacity=".18"/>
+            <stop offset="100%" stop-color="#448aff" stop-opacity="0"/>
+          </linearGradient>
+          <linearGradient id="lineGrad" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#448aff"/>
+            <stop offset="55%" stop-color="#18ffff"/>
+            <stop offset="100%" stop-color="#00e676"/>
+          </linearGradient>
+        </defs>
+        <line x1="60" y1="20" x2="60" y2="260" stroke="#1e2330" stroke-width=".5"/>
+        <line x1="60" y1="260" x2="980" y2="260" stroke="#1e2330" stroke-width=".5"/>
+        <line x1="60" y1="65" x2="980" y2="65" stroke="#1e2330" stroke-width=".5" stroke-dasharray="4"/>
+        <line x1="60" y1="130" x2="980" y2="130" stroke="#1e2330" stroke-width=".5" stroke-dasharray="4"/>
+        <line x1="60" y1="195" x2="980" y2="195" stroke="#1e2330" stroke-width=".5" stroke-dasharray="4"/>
+        <text x="50" y="24" font-family="JetBrains Mono" font-size="9" fill="#565e74" text-anchor="end">$400</text>
+        <text x="50" y="69" font-family="JetBrains Mono" font-size="9" fill="#565e74" text-anchor="end">$330</text>
+        <text x="50" y="134" font-family="JetBrains Mono" font-size="9" fill="#565e74" text-anchor="end">$260</text>
+        <text x="50" y="199" font-family="JetBrains Mono" font-size="9" fill="#565e74" text-anchor="end">$190</text>
+        <text x="50" y="264" font-family="JetBrains Mono" font-size="9" fill="#565e74" text-anchor="end">$130</text>
+        <text x="80" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Apr</text>
+        <text x="155" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">May</text>
+        <text x="230" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Jun</text>
+        <text x="305" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Jul</text>
+        <text x="380" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Aug</text>
+        <text x="455" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Sep</text>
+        <text x="530" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Oct</text>
+        <text x="605" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Nov</text>
+        <text x="680" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Dec</text>
+        <text x="755" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Jan</text>
+        <text x="830" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Feb</text>
+        <text x="905" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Mar</text>
+        <text x="960" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Apr</text>
+        <!-- Monthly approx. closes; y = 20 + (400-p)/270*240 -->
+        <path d="M 80,226 L 155,202 230,187 305,173 380,182 455,155 530,137 605,122 680,107 755,93 830,31 905,57 960,36 L 960,260 80,260 Z" fill="url(#chartFill)"/>
+        <polyline points="80,226 155,202 230,187 305,173 380,182 455,155 530,137 605,122 680,107 755,93 830,31 905,57 960,36" fill="none" stroke="url(#lineGrad)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+        <circle cx="80" cy="226" r="3" fill="#448aff"/>
+        <circle cx="830" cy="31" r="4" fill="#00e676" stroke="#08090d" stroke-width="2"/>
+        <circle cx="960" cy="36" r="4" fill="#18ffff" stroke="#08090d" stroke-width="2"/>
+
+        <line x1="80" y1="226" x2="80" y2="242" stroke="#ff5252" stroke-width=".8" stroke-dasharray="3"/>
+        <rect x="38" y="244" width="84" height="16" rx="4" fill="#2a0e0e" stroke="#ff5252" stroke-width=".5"/>
+        <text x="80" y="255" font-family="JetBrains Mono" font-size="7.5" fill="#ff5252" text-anchor="middle">52w Low ~$134</text>
+
+        <line x1="680" y1="107" x2="680" y2="88" stroke="#ffab40" stroke-width=".8" stroke-dasharray="3"/>
+        <rect x="632" y="72" width="96" height="16" rx="4" fill="#2a1e0a" stroke="#ffab40" stroke-width=".5"/>
+        <text x="680" y="83" font-family="JetBrains Mono" font-size="7.5" fill="#ffab40" text-anchor="middle">Q4'25 Beat</text>
+
+        <line x1="830" y1="31" x2="830" y2="52" stroke="#00e676" stroke-width=".8" stroke-dasharray="3"/>
+        <rect x="778" y="2" width="104" height="18" rx="4" fill="#0a2618" stroke="#00e676" stroke-width=".5"/>
+        <text x="830" y="14" font-family="JetBrains Mono" font-size="8" fill="#00e676" text-anchor="middle">ATH ~$390</text>
+
+        <line x1="960" y1="36" x2="960" y2="56" stroke="#18ffff" stroke-width=".8" stroke-dasharray="3"/>
+        <rect x="888" y="58" width="144" height="16" rx="4" fill="#0e1017" stroke="#18ffff" stroke-width=".5"/>
+        <text x="960" y="69" font-family="JetBrains Mono" font-size="7.5" fill="#18ffff" text-anchor="middle">Q1'26 Record Rev</text>
+      </svg>
+    </div>
+  </div>
+
+  <div class="section-title">Fundamental Scorecard</div>
+  <div class="card-grid">
+    <div class="card amber">
+      <div class="card-title"><span class="dot-ind"></span>Valuation</div>
+      <ul>
+        <li>Trailing P/E<span class="v a">~32×</span></li>
+        <li>Forward P/E<span class="v a">~24×</span></li>
+        <li>EV / Revenue<span class="v a">~9.5×</span></li>
+        <li>PEG (est.)<span class="v g">&lt;1.2</span></li>
+        <li>Price / FCF<span class="v a">Elevated</span></li>
+      </ul>
+    </div>
+    <div class="card green">
+      <div class="card-title"><span class="dot-ind"></span>Financial Health</div>
+      <ul>
+        <li>Net Cash<span class="v g">Yes</span></li>
+        <li>Interest Coverage<span class="v g">Very High</span></li>
+        <li>Liquidity<span class="v g">Strong</span></li>
+        <li>Capex Funding<span class="v g">FCF + Debt capacity</span></li>
+        <li>Credit Profile<span class="v g">A+/Aa band</span></li>
+      </ul>
+    </div>
+    <div class="card green">
+      <div class="card-title"><span class="dot-ind"></span>Growth</div>
+      <ul>
+        <li>Q1'26 Rev YoY<span class="v g">~+35%</span></li>
+        <li>HPC / AI Mix<span class="v g">55% rev (Q4'25)</span></li>
+        <li>3nm Ramp<span class="v g">28% wafer rev</span></li>
+        <li>2026 Capex<span class="v r">$52–56B</span></li>
+        <li>Smartphone Mix<span class="v a">32% (cyclical)</span></li>
+      </ul>
+    </div>
+
+    <div class="card green">
+      <div class="card-title"><span class="dot-ind"></span>Profitability</div>
+      <ul>
+        <li>Gross Margin (Q4'25)<span class="v g">62.3%</span></li>
+        <li>Operating Margin<span class="v g">54.0%</span></li>
+        <li>Net Margin<span class="v g">~48%</span></li>
+        <li>ROE (cycle)<span class="v g">High</span></li>
+        <li>Pricing Power<span class="v g">CoWoS / N3</span></li>
+      </ul>
+    </div>
+    <div class="card amber">
+      <div class="card-title"><span class="dot-ind"></span>Cash Flow</div>
+      <ul>
+        <li>Operating Cash Flow<span class="v g">Robust</span></li>
+        <li>Free Cash Flow<span class="v a">Capex-heavy '26</span></li>
+        <li>Capex Intensity<span class="v a">Super-cycle</span></li>
+        <li>Shareholder Returns<span class="v g">Dividend ↑</span></li>
+        <li>FCF Yield<span class="v a">Full valuation</span></li>
+      </ul>
+    </div>
+    <div class="card red">
+      <div class="card-title"><span class="dot-ind"></span>Geo &amp; Concentration</div>
+      <ul>
+        <li>Taiwan Strait / IDM<span class="v r">Tail risk</span></li>
+        <li>Customer Concentration<span class="v r">Top-5 &gt;60%</span></li>
+        <li>Export Controls<span class="v r">US-CN friction</span></li>
+        <li>Arizona Ramp<span class="v a">Cost / learning</span></li>
+        <li>Energy / Water<span class="v a">Fab inputs</span></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="breakdown">
+    <h3>Score Breakdown &middot; Weighted Components</h3>
+    <div class="bar-row">
+      <div class="bar-label">Valuation <span style="color:var(--text-muted);font-size:.7rem">(35%)</span></div>
+      <div class="bar-track">
+        <div class="bar-fill" style="width:63%;background:linear-gradient(90deg,var(--amber),#ffd54f)"></div>
+      </div>
+      <div class="bar-num" style="color:var(--amber)">22 / 35</div>
+    </div>
+    <div class="bar-row">
+      <div class="bar-label">Financial Health <span style="color:var(--text-muted);font-size:.7rem">(35%)</span></div>
+      <div class="bar-track">
+        <div class="bar-fill" style="width:23%;background:linear-gradient(90deg,var(--green),#69f0ae)"></div>
+      </div>
+      <div class="bar-num" style="color:var(--green)">8 / 35</div>
+    </div>
+    <div class="bar-row">
+      <div class="bar-label">Growth <span style="color:var(--text-muted);font-size:.7rem">(30%)</span></div>
+      <div class="bar-track">
+        <div class="bar-fill" style="width:47%;background:linear-gradient(90deg,var(--cyan),#69f0ae)"></div>
+      </div>
+      <div class="bar-num" style="color:var(--cyan)">14 / 30</div>
+    </div>
+    <div style="text-align:right;font-family:var(--mono);font-size:.85rem;color:var(--text);margin-top:8px;padding-right:0">
+      Composite Score: <span style="color:var(--cyan);font-weight:700;font-size:1rem">44 / 100</span>
+      <span style="color:var(--text-muted);font-size:.72rem;margin-left:8px">Higher = Higher Risk</span>
+    </div>
+  </div>
+
+  <div class="report-footer">
+    April 14, 2026 — 20:54 CET &middot; Sources: TSMC investor materials, Reuters, TechPowerUp, trade press &middot; Not investment advice
+  </div>
+</div>
+
+<!-- ========== PAGE 2 ========== -->
+<div class="page" id="page2">
+
+  <div style="display:flex;align-items:baseline;gap:16px;margin-bottom:28px">
+    <span style="font-family:var(--mono);font-size:1.3rem;font-weight:700">TSM</span>
+    <span style="font-size:.85rem;color:var(--text-dim)">Risk Report — Page 2 of 2</span>
+    <span style="margin-left:auto;font-family:var(--mono);font-size:.75rem;color:var(--text-muted)">14 Apr 2026 · 20:54 CET</span>
+  </div>
+
+  <div class="section-title">Quarterly Financial Trends</div>
+  <table class="qtable">
+    <thead>
+      <tr>
+        <th>Metric</th>
+        <th>Q1 '25</th>
+        <th>Q2 '25</th>
+        <th>Q3 '25</th>
+        <th>Q4 '25</th>
+        <th style="color:var(--cyan)">Q1 '26</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="highlight">
+        <td>Revenue ($B)</td>
+        <td>25.53</td>
+        <td>30.07</td>
+        <td>33.10</td>
+        <td>33.73</td>
+        <td style="color:var(--green)">~35.6</td>
+      </tr>
+      <tr>
+        <td>Gross Margin</td>
+        <td style="color:var(--green)">58.8%</td>
+        <td>59.6%</td>
+        <td style="color:var(--green)">59.5%</td>
+        <td style="color:var(--green)">62.3%</td>
+        <td style="color:var(--text-muted)">~63–65% (guide)</td>
+      </tr>
+      <tr>
+        <td>Operating Margin</td>
+        <td>48.5%</td>
+        <td>49.9%</td>
+        <td style="color:var(--green)">50.6%</td>
+        <td style="color:var(--green)">54.0%</td>
+        <td style="color:var(--text-muted)">~54–56% (guide)</td>
+      </tr>
+      <tr>
+        <td>EPS (diluted, USD)</td>
+        <td>~1.95</td>
+        <td>~2.20</td>
+        <td>~2.65</td>
+        <td style="color:var(--green)">3.14</td>
+        <td style="color:var(--text-muted)">~3.35 (est.)</td>
+      </tr>
+      <tr>
+        <td>HPC % of Revenue</td>
+        <td>52%</td>
+        <td>54%</td>
+        <td>55%</td>
+        <td style="color:var(--green)">55%</td>
+        <td style="color:var(--text-muted)">Trend ↑</td>
+      </tr>
+      <tr>
+        <td>Capex (annual guide)</td>
+        <td colspan="4" style="text-align:center;color:var(--text-muted)">Step-up through 2025 into 2026 mega-cycle</td>
+        <td style="color:var(--amber)">$52–56B</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="earnings-box">
+    <h4>Latest Update — Q1 2026 Results &amp; Shipment Outlook</h4>
+    <p>
+      TSMC reported another record quarter as AI accelerators and advanced packaging (CoWoS) kept leading-edge nodes sold out: consolidated revenue for Q1 2026 is reported in the <strong>~US$35.6B</strong> range (~35% YoY), extending a multi-quarter growth streak. Margins remain structurally high versus the broader semi peer set. Management’s <strong>2026 capex band of US$52–56B</strong> underscores confidence in long-dated AI demand but raises execution and free-cash-flow absorption risk if spending front-runs revenue. Watch the next formal call materials for <span class="highlight-date">N2 roadmap clarity</span>, Arizona/Japan/Korea build-outs, and any commentary on advanced-node pricing and CoWoS allocation — those items move both EPS and the geopolitical narrative.
+    </p>
+  </div>
+
+  <div class="dual">
+    <div class="dual-col catalysts">
+      <h4><span class="ic">▲</span> Catalysts</h4>
+      <ul>
+        <li><strong>AI accelerator pull</strong> — Nvidia/AMD/custom ASIC ramps keep N3/N5 and CoWoS tight into 2027</li>
+        <li><strong>Node leadership</strong> — continued share gains at leading edge vs foundry competitors</li>
+        <li><strong>Pricing power</strong> — value-based pricing on scarce leading-edge capacity</li>
+        <li><strong>Geographic diversification</strong> — U.S./EU/JP fabs derisk single-site concentration over time</li>
+        <li><strong>Advanced packaging</strong> — SoIC/CoWoS upsell increases ASP and customer stickiness</li>
+        <li><strong>Apple / smartphone snapback</strong> — better China handset cycle aids mature-node mix</li>
+      </ul>
+    </div>
+    <div class="dual-col risks">
+      <h4><span class="ic">▼</span> Risks</h4>
+      <ul>
+        <li><strong>Geopolitical shock</strong> — cross-strait instability is a nonlinear, unhedgeable tail for holders</li>
+        <li><strong>Export controls</strong> — further U.S. rules on China-bound AI silicon could pressure growth</li>
+        <li><strong>Capex digestion</strong> — $52–56B spend can compress FCF if demand hiccups</li>
+        <li><strong>Customer concentration</strong> — top hyperscaler/AI customers drive outsized rev swings</li>
+        <li><strong>Competitive catch-up</strong> — Intel 18A / Samsung gate-all-around timelines bear monitoring</li>
+        <li><strong>Valuation</strong> — premium multiples amplify drawdowns if growth re-rates lower</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="bottom-line">
+    <h3>Bottom Line</h3>
+    <p>
+      TSMC is among the highest-quality franchises in global semiconductors: technology leadership, exceptional margins, and a multi-year AI capex wave support the bull case. The stock’s main friction is not near-term demand — it is <strong>price + politics</strong>: full multiples and Taiwan Strait tail risk mean you are paying for operational excellence while carrying a fat-tailed geopolitical option short. For long-term holders, dips have historically been bought; for new money, sizing and hedges matter more than another 100bps of margin upside.
+    </p>
+    <div class="rating-bar">
+      <div class="segments">
+        <div class="seg"></div>
+        <div class="seg active-g"></div>
+        <div class="seg active-g"></div>
+        <div class="seg active-g"></div>
+        <div class="seg active-g"></div>
+        <div class="seg active-g"></div>
+        <div class="seg active-a"></div>
+        <div class="seg active-a"></div>
+        <div class="seg"></div>
+        <div class="seg"></div>
+      </div>
+      <div class="verdict">BUY — SIZE FOR GEO RISK</div>
+    </div>
+    <div class="rating-labels">
+      <span>Strong Buy</span>
+      <span>Buy</span>
+      <span>Hold</span>
+      <span>Sell</span>
+      <span>Strong Sell</span>
+    </div>
+  </div>
+
+  <div class="report-footer">
+    April 14, 2026 — 20:54 CET &middot; Sources: TSMC IR, Reuters, industry news &middot; Not investment advice &middot; Past performance ≠ future results
+  </div>
+</div>
+
+<button class="copy-btn" onclick="copyReport()">📋 Copy to Clipboard</button>
+
+<script>
+function copyReport(){
+  const text = [];
+  text.push('TSM (TSMC) RISK SCORE REPORT — April 14, 2026 · 20:54 CET');
+  text.push('═'.repeat(52));
+  text.push('Price: $380.64 | YTD: ~+21% | Mkt Cap: ~$1.66T');
+  text.push('52-Week: $134.25 – $390.21 | P/E (TTM): ~32×');
+  text.push('');
+  text.push('RISK SCORE: 44/100 — Moderate Risk');
+  text.push('  Valuation:       22/35');
+  text.push('  Financial Health: 8/35');
+  text.push('  Growth:         14/30');
+  text.push('');
+  text.push('KEY METRICS');
+  text.push('  Q1 2026 Revenue: ~$35.6B (~+35% YoY)');
+  text.push('  Q4 2025 Gross Margin: 62.3% | Op margin: 54.0%');
+  text.push('  2026 Capex guide: $52–56B');
+  text.push('  Q4 2025 EPS (USD): $3.14');
+  text.push('');
+  text.push('VERDICT: BUY — SIZE FOR GEO RISK');
+  text.push('');
+  text.push('Not investment advice.');
+
+  navigator.clipboard.writeText(text.join('\n')).then(()=>{
+    const btn = document.querySelector('.copy-btn');
+    btn.textContent = '✓ Copied!';
+    btn.style.background = '#00e676';
+    btn.style.color = '#08090d';
+    btn.style.borderColor = '#00e676';
+    setTimeout(()=>{
+      btn.textContent = '📋 Copy to Clipboard';
+      btn.style.background = '';
+      btn.style.color = '';
+      btn.style.borderColor = '';
+    }, 2000);
+  });
+}
+</script>
+
+</body>
+</html>

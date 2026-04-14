@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ORCL Risk Score Report — April 2026</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#08090d;--surface:#0e1017;--surface2:#141720;--surface3:#1a1e2a;
+    --border:#1e2330;--border-light:#2a3040;
+    --text:#e8eaf0;--text-dim:#8890a4;--text-muted:#565e74;
+    --green:#00e676;--green-dim:#00e67620;--green-bg:#0a2618;
+    --red:#ff5252;--red-dim:#ff525220;--red-bg:#2a0e0e;
+    --amber:#ffab40;--amber-dim:#ffab4020;--amber-bg:#2a1e0a;
+    --blue:#448aff;--blue-dim:#448aff20;
+    --cyan:#18ffff;
+    --mono:'JetBrains Mono',monospace;
+    --sans:'DM Sans',sans-serif;
+    --page-w:1080px;
+  }
+  html{font-size:14px}
+  body{background:var(--bg);color:var(--text);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
+
+  .page{max-width:var(--page-w);margin:0 auto;padding:48px 40px;min-height:100vh;position:relative}
+  .page+.page{border-top:1px solid var(--border)}
+  .page::before{content:'';position:absolute;top:0;left:0;right:0;height:260px;background:linear-gradient(180deg,#448aff08 0%,transparent 100%);pointer-events:none}
+
+  @media print{.page{page-break-before:always;padding:24px}}
+
+  .stock-bar{display:flex;align-items:center;gap:20px;padding:16px 24px;background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:32px;position:relative;overflow:hidden}
+  .stock-bar::after{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--blue),transparent)}
+  .stock-bar .ticker{font-family:var(--mono);font-size:1.7rem;font-weight:700;letter-spacing:-.02em;color:var(--text)}
+  .stock-bar .company{font-size:.95rem;color:var(--text-dim);margin-left:-8px}
+  .stock-bar .price-block{margin-left:auto;text-align:right}
+  .stock-bar .price{font-family:var(--mono);font-size:1.6rem;font-weight:600}
+  .stock-bar .change{font-family:var(--mono);font-size:.85rem;padding:3px 10px;border-radius:6px;display:inline-block;margin-top:2px}
+  .stock-bar .change.neg{color:var(--red);background:var(--red-dim)}
+  .stock-bar .change.pos{color:var(--green);background:var(--green-dim)}
+  .stock-bar .meta{font-family:var(--mono);font-size:.75rem;color:var(--text-muted);display:flex;flex-direction:column;gap:2px;min-width:160px}
+  .stock-bar .dot{width:8px;height:8px;border-radius:50%;background:var(--amber);box-shadow:0 0 8px var(--amber);animation:pulse 2s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+  .gauge-row{display:flex;align-items:center;gap:40px;margin-bottom:36px}
+  .gauge-wrap{width:220px;flex-shrink:0;position:relative}
+  .gauge-wrap svg{width:100%;display:block}
+  .gauge-label{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);text-align:center}
+  .gauge-label .num{font-family:var(--mono);font-size:2.8rem;font-weight:700;line-height:1;color:var(--amber)}
+  .gauge-label .sub{font-size:.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.12em;margin-top:2px}
+  .score-desc{flex:1}
+  .score-desc h2{font-size:1.1rem;font-weight:600;margin-bottom:6px;color:var(--amber)}
+  .score-desc p{font-size:.88rem;color:var(--text-dim);line-height:1.6;max-width:520px}
+
+  .kpi-strip{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:36px}
+  .kpi{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;position:relative;overflow:hidden}
+  .kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+  .kpi.g::before{background:var(--green)}.kpi.r::before{background:var(--red)}.kpi.a::before{background:var(--amber)}.kpi.b::before{background:var(--blue)}
+  .kpi .label{font-size:.65rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);margin-bottom:6px}
+  .kpi .val{font-family:var(--mono);font-size:1.15rem;font-weight:600}
+  .kpi .sub{font-family:var(--mono);font-size:.7rem;color:var(--text-muted);margin-top:2px}
+
+  .chart-section{margin-bottom:36px}
+  .chart-section h3{font-size:.75rem;text-transform:uppercase;letter-spacing:.12em;color:var(--text-muted);margin-bottom:12px}
+  .chart-box{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px 24px 16px;position:relative;overflow:hidden}
+  .chart-box svg{width:100%;display:block}
+
+  .card-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:36px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px 20px;position:relative;overflow:hidden}
+  .card::before{content:'';position:absolute;top:0;left:0;width:3px;height:100%;border-radius:0 3px 3px 0}
+  .card.green::before{background:var(--green)}.card.red::before{background:var(--red)}.card.amber::before{background:var(--amber)}
+  .card .card-title{font-size:.7rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);margin-bottom:10px;display:flex;align-items:center;gap:8px}
+  .card .card-title .dot-ind{width:6px;height:6px;border-radius:50%}
+  .card.green .dot-ind{background:var(--green)}.card.red .dot-ind{background:var(--red)}.card.amber .dot-ind{background:var(--amber)}
+  .card ul{list-style:none;padding:0}
+  .card li{font-size:.82rem;color:var(--text-dim);padding:4px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+  .card li:last-child{border:none}
+  .card li .v{font-family:var(--mono);font-weight:500;font-size:.8rem}
+  .card li .v.g{color:var(--green)}.card li .v.r{color:var(--red)}.card li .v.a{color:var(--amber)}
+
+  .breakdown{margin-bottom:16px}
+  .breakdown h3{font-size:.75rem;text-transform:uppercase;letter-spacing:.12em;color:var(--text-muted);margin-bottom:14px}
+  .bar-row{display:flex;align-items:center;gap:14px;margin-bottom:10px}
+  .bar-row .bar-label{font-size:.8rem;color:var(--text-dim);width:140px;flex-shrink:0}
+  .bar-row .bar-track{flex:1;height:10px;background:var(--surface2);border-radius:5px;overflow:hidden;position:relative}
+  .bar-row .bar-fill{height:100%;border-radius:5px;position:relative}
+  .bar-row .bar-fill::after{content:'';position:absolute;top:0;right:0;bottom:0;width:40%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.12))}
+  .bar-row .bar-num{font-family:var(--mono);font-size:.8rem;font-weight:600;width:60px;text-align:right;flex-shrink:0}
+
+  .qtable{width:100%;border-collapse:collapse;margin-bottom:36px;font-size:.82rem}
+  .qtable th{font-size:.65rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);font-weight:500;padding:10px 12px;text-align:right;border-bottom:1px solid var(--border-light)}
+  .qtable th:first-child{text-align:left}
+  .qtable td{font-family:var(--mono);font-weight:400;padding:10px 12px;text-align:right;border-bottom:1px solid var(--border);color:var(--text-dim)}
+  .qtable td:first-child{font-family:var(--sans);color:var(--text);text-align:left;font-weight:500}
+  .qtable tr:hover td{background:var(--surface)}
+  .qtable .highlight td{background:var(--surface2);color:var(--text)}
+
+  .dual{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:36px}
+  .dual-col{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px 22px}
+  .dual-col h4{font-size:.7rem;text-transform:uppercase;letter-spacing:.12em;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+  .dual-col h4 .ic{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.65rem}
+  .dual-col.catalysts h4{color:var(--green)}.dual-col.catalysts h4 .ic{background:var(--green-dim);color:var(--green)}
+  .dual-col.risks h4{color:var(--red)}.dual-col.risks h4 .ic{background:var(--red-dim);color:var(--red)}
+  .dual-col li{font-size:.82rem;color:var(--text-dim);padding:6px 0;border-bottom:1px solid var(--border);line-height:1.5}
+  .dual-col li:last-child{border:none}
+  .dual-col ul{list-style:none;padding:0}
+
+  .earnings-box{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px 24px;margin-bottom:36px}
+  .earnings-box h4{font-size:.7rem;text-transform:uppercase;letter-spacing:.12em;color:var(--text-muted);margin-bottom:10px}
+  .earnings-box p{font-size:.88rem;color:var(--text-dim);line-height:1.65}
+  .earnings-box .highlight-date{font-family:var(--mono);color:var(--cyan);font-weight:500}
+
+  .bottom-line{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px 28px;position:relative;overflow:hidden}
+  .bottom-line::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--red),var(--amber),var(--green))}
+  .bottom-line h3{font-size:.95rem;font-weight:600;margin-bottom:8px;color:var(--text)}
+  .bottom-line p{font-size:.88rem;color:var(--text-dim);line-height:1.65;margin-bottom:16px}
+  .rating-bar{display:flex;align-items:center;gap:16px;margin-top:14px}
+  .rating-bar .segments{display:flex;gap:3px;flex:1}
+  .rating-bar .seg{height:8px;flex:1;border-radius:4px;background:var(--surface2)}
+  .rating-bar .seg.active-r{background:var(--red)}.rating-bar .seg.active-a{background:var(--amber)}.rating-bar .seg.active-g{background:var(--green)}
+  .rating-bar .verdict{font-family:var(--mono);font-size:.95rem;font-weight:700;color:var(--amber);white-space:nowrap}
+  .rating-labels{display:flex;justify-content:space-between;margin-top:6px;font-size:.6rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted)}
+
+  .copy-btn{position:fixed;bottom:24px;right:24px;background:var(--surface2);border:1px solid var(--border-light);color:var(--text-dim);font-family:var(--mono);font-size:.75rem;padding:10px 18px;border-radius:8px;cursor:pointer;z-index:100;transition:all .2s}
+  .copy-btn:hover{background:var(--blue);color:#fff;border-color:var(--blue)}
+
+  .section-title{font-size:.75rem;text-transform:uppercase;letter-spacing:.12em;color:var(--text-muted);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+
+  .report-footer{text-align:center;padding:20px 0 0;font-size:.65rem;color:var(--text-muted);border-top:1px solid var(--border);margin-top:32px}
+
+  .ts-header{display:flex;align-items:center;justify-content:flex-end;margin-bottom:14px}
+  .ts-header span{font-family:var(--mono);font-size:.7rem;color:var(--text-muted);letter-spacing:.04em}
+
+  @media(max-width:800px){
+    .kpi-strip{grid-template-columns:repeat(3,1fr)}
+    .card-grid{grid-template-columns:1fr}
+    .dual{grid-template-columns:1fr}
+    .stock-bar{flex-wrap:wrap}
+    .gauge-row{flex-direction:column;align-items:flex-start}
+  }
+</style>
+</head>
+<body>
+
+<div class="page" id="page1">
+
+  <div class="ts-header">
+    <span id="analysis-ts">April 14, 2026 — 20:54 CET</span>
+  </div>
+
+  <div class="stock-bar">
+    <div class="dot"></div>
+    <div>
+      <div class="ticker">ORCL</div>
+      <div class="company">Oracle Corporation &middot; NYSE</div>
+    </div>
+    <div class="meta">
+      <span>Mkt Cap <b style="color:var(--text)">$465B</b></span>
+      <span>52w <b style="color:var(--text)">$121.24 – $345.72</b></span>
+      <span>Vol <b style="color:var(--text)">4.58M</b></span>
+    </div>
+    <div class="price-block">
+      <div class="price">$161.93</div>
+      <div class="change neg">▼ 23.0% YTD</div>
+    </div>
+  </div>
+
+  <div class="gauge-row">
+    <div class="gauge-wrap">
+      <svg viewBox="0 0 200 120" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="gaugeBg" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#1a1e2a"/>
+            <stop offset="100%" stop-color="#1a1e2a"/>
+          </linearGradient>
+          <linearGradient id="gaugeGrad" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#00e676"/>
+            <stop offset="40%" stop-color="#ffab40"/>
+            <stop offset="100%" stop-color="#ff5252"/>
+          </linearGradient>
+        </defs>
+        <path d="M 20 105 A 80 80 0 0 1 180 105" fill="none" stroke="url(#gaugeBg)" stroke-width="12" stroke-linecap="round"/>
+        <path d="M 20 105 A 80 80 0 0 1 180 105" fill="none" stroke="url(#gaugeGrad)" stroke-width="12" stroke-linecap="round" stroke-dasharray="251" stroke-dashoffset="115" opacity=".9"/>
+        <text x="14" y="115" font-family="JetBrains Mono" font-size="8" fill="#565e74">0</text>
+        <text x="93" y="20" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">50</text>
+        <text x="178" y="115" font-family="JetBrains Mono" font-size="8" fill="#565e74">100</text>
+        <circle cx="68" cy="52" r="4" fill="#ffab40" opacity=".9"/>
+      </svg>
+      <div class="gauge-label">
+        <div class="num">54</div>
+        <div class="sub">Risk Score</div>
+      </div>
+    </div>
+    <div class="score-desc">
+      <h2>Elevated Risk — AI Scale vs. Balance Sheet</h2>
+      <p>Oracle is posting cloud-infra growth above 80% YoY with record RPO near $553B and raised FY27 revenue outlook to ~$90B, but the build-out is funded with large debt/equity raises, sharply negative free cash flow (~$13B TTM), and a stock still ~53% below its September 2025 peak. Multiples are not Tesla-extreme, yet financing and execution risk keep the composite score in the mid-50s.</p>
+    </div>
+  </div>
+
+  <div class="kpi-strip">
+    <div class="kpi a">
+      <div class="label">Trailing P/E</div>
+      <div class="val" style="color:var(--amber)">29.5×</div>
+      <div class="sub">Fwd ~20.6×</div>
+    </div>
+    <div class="kpi g">
+      <div class="label">Q3 FY26 Revenue</div>
+      <div class="val">$17.19B</div>
+      <div class="sub" style="color:var(--green)">+22% YoY</div>
+    </div>
+    <div class="kpi g">
+      <div class="label">Cloud Revenue</div>
+      <div class="val">$8.9B</div>
+      <div class="sub" style="color:var(--green)">+44% YoY</div>
+    </div>
+    <div class="kpi g">
+      <div class="label">RPO (Backlog)</div>
+      <div class="val">$553B</div>
+      <div class="sub" style="color:var(--green)">+325% YoY</div>
+    </div>
+    <div class="kpi r">
+      <div class="label">TTM Free Cash Flow</div>
+      <div class="val" style="color:var(--red)">−$13.2B</div>
+      <div class="sub">CapEx-heavy AI build</div>
+    </div>
+    <div class="kpi b">
+      <div class="label">Next Earnings</div>
+      <div class="val" style="color:var(--cyan)">~Jun 11</div>
+      <div class="sub">Q4 FY26 (est.)</div>
+    </div>
+  </div>
+
+  <div class="chart-section">
+    <h3>12-Month Price Action &middot; ORCL</h3>
+    <div class="chart-box">
+      <svg viewBox="0 0 1000 300" xmlns="http://www.w3.org/2000/svg" style="overflow:visible">
+        <defs>
+          <linearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#448aff" stop-opacity=".18"/>
+            <stop offset="100%" stop-color="#448aff" stop-opacity="0"/>
+          </linearGradient>
+          <linearGradient id="lineGrad" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#448aff"/>
+            <stop offset="55%" stop-color="#00e676"/>
+            <stop offset="82%" stop-color="#ffab40"/>
+            <stop offset="100%" stop-color="#ff5252"/>
+          </linearGradient>
+        </defs>
+        <line x1="60" y1="20" x2="60" y2="260" stroke="#1e2330" stroke-width=".5"/>
+        <line x1="60" y1="260" x2="980" y2="260" stroke="#1e2330" stroke-width=".5"/>
+        <line x1="60" y1="65" x2="980" y2="65" stroke="#1e2330" stroke-width=".5" stroke-dasharray="4"/>
+        <line x1="60" y1="130" x2="980" y2="130" stroke="#1e2330" stroke-width=".5" stroke-dasharray="4"/>
+        <line x1="60" y1="195" x2="980" y2="195" stroke="#1e2330" stroke-width=".5" stroke-dasharray="4"/>
+        <text x="50" y="24" font-family="JetBrains Mono" font-size="9" fill="#565e74" text-anchor="end">$360</text>
+        <text x="50" y="69" font-family="JetBrains Mono" font-size="9" fill="#565e74" text-anchor="end">$280</text>
+        <text x="50" y="134" font-family="JetBrains Mono" font-size="9" fill="#565e74" text-anchor="end">$200</text>
+        <text x="50" y="199" font-family="JetBrains Mono" font-size="9" fill="#565e74" text-anchor="end">$140</text>
+        <text x="50" y="264" font-family="JetBrains Mono" font-size="9" fill="#565e74" text-anchor="end">$110</text>
+        <text x="80" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Apr</text>
+        <text x="155" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">May</text>
+        <text x="230" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Jun</text>
+        <text x="305" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Jul</text>
+        <text x="380" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Aug</text>
+        <text x="455" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Sep</text>
+        <text x="530" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Oct</text>
+        <text x="605" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Nov</text>
+        <text x="680" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Dec</text>
+        <text x="755" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Jan</text>
+        <text x="830" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Feb</text>
+        <text x="905" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Mar</text>
+        <text x="960" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Apr</text>
+        <!-- Monthly approx closes; Y: price 110→360 maps to y 260→20 -->
+        <path d="M 80,232 L 155,218 230,205 305,188 380,172 455,28 530,118 605,142 680,155 755,168 830,182 905,195 960,202 L 960,260 80,260 Z" fill="url(#chartFill)"/>
+        <polyline points="80,232 155,218 230,205 305,188 380,172 455,28 530,118 605,142 680,155 755,168 830,182 905,195 960,202" fill="none" stroke="url(#lineGrad)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+        <circle cx="80" cy="232" r="3" fill="#448aff"/>
+        <circle cx="455" cy="28" r="4" fill="#00e676" stroke="#08090d" stroke-width="2"/>
+        <circle cx="960" cy="202" r="4" fill="#ff5252" stroke="#08090d" stroke-width="2"/>
+
+        <line x1="455" y1="28" x2="455" y2="48" stroke="#00e676" stroke-width=".8" stroke-dasharray="3"/>
+        <rect x="395" y="6" width="120" height="18" rx="4" fill="#0a2618" stroke="#00e676" stroke-width=".5"/>
+        <text x="455" y="18" font-family="JetBrains Mono" font-size="8" fill="#00e676" text-anchor="middle">ATH ~$345 Sep '25</text>
+
+        <line x1="605" y1="142" x2="605" y2="125" stroke="#ff5252" stroke-width=".8" stroke-dasharray="3"/>
+        <rect x="538" y="108" width="134" height="16" rx="4" fill="#2a0e0e" stroke="#ff5252" stroke-width=".5"/>
+        <text x="605" y="119" font-family="JetBrains Mono" font-size="7.5" fill="#ff5252" text-anchor="middle">Q2 FY26 Rev miss (Dec)</text>
+
+        <line x1="905" y1="195" x2="905" y2="178" stroke="#ffab40" stroke-width=".8" stroke-dasharray="3"/>
+        <rect x="848" y="160" width="114" height="16" rx="4" fill="#2a1e0a" stroke="#ffab40" stroke-width=".5"/>
+        <text x="905" y="171" font-family="JetBrains Mono" font-size="7.5" fill="#ffab40" text-anchor="middle">Q3 FY26 beat</text>
+
+        <line x1="960" y1="202" x2="960" y2="222" stroke="#448aff" stroke-width=".8" stroke-dasharray="3"/>
+        <rect x="900" y="226" width="120" height="16" rx="4" fill="#0e1017" stroke="#448aff" stroke-width=".5"/>
+        <text x="960" y="237" font-family="JetBrains Mono" font-size="7.5" fill="#8890a4" text-anchor="middle">YTD −23% zone</text>
+      </svg>
+    </div>
+  </div>
+
+  <div class="section-title">Fundamental Scorecard</div>
+  <div class="card-grid">
+    <div class="card amber">
+      <div class="card-title"><span class="dot-ind"></span>Valuation</div>
+      <ul>
+        <li>Trailing P/E<span class="v a">29.5×</span></li>
+        <li>Forward P/E<span class="v g">~20.6×</span></li>
+        <li>EV / Revenue<span class="v a">~10×</span></li>
+        <li>Price vs. Sep peak<span class="v g">−53%</span></li>
+        <li>Equity raise overhang<span class="v r">$45–50B plan</span></li>
+      </ul>
+    </div>
+    <div class="card red">
+      <div class="card-title"><span class="dot-ind"></span>Financial Health</div>
+      <ul>
+        <li>Net debt profile<span class="v r">Heavy</span></li>
+        <li>TTM Free Cash Flow<span class="v r">−$13.2B</span></li>
+        <li>FY26 CapEx guide<span class="v r">~$50B</span></li>
+        <li>Investment grade<span class="v g">Committed</span></li>
+        <li>Liquidity / funding<span class="v a">Customer prepay mix</span></li>
+      </ul>
+    </div>
+    <div class="card green">
+      <div class="card-title"><span class="dot-ind"></span>Growth</div>
+      <ul>
+        <li>Total revenue (Q3)<span class="v g">+22% YoY</span></li>
+        <li>Cloud revenue<span class="v g">+44% YoY</span></li>
+        <li>Cloud IaaS<span class="v g">+84% YoY</span></li>
+        <li>RPO backlog<span class="v g">$553B</span></li>
+        <li>FY27 revenue guide<span class="v g">~$90B</span></li>
+      </ul>
+    </div>
+
+    <div class="card green">
+      <div class="card-title"><span class="dot-ind"></span>Profitability</div>
+      <ul>
+        <li>Non-GAAP EPS (Q3)<span class="v g">$1.79</span></li>
+        <li>vs. consensus<span class="v g">Beat $1.70</span></li>
+        <li>GAAP EPS (Q3)<span class="v g">$1.27</span></li>
+        <li>Cloud scale margin path<span class="v a">IaaS mix</span></li>
+        <li>Software license trend<span class="v a">Legacy drag</span></li>
+      </ul>
+    </div>
+    <div class="card red">
+      <div class="card-title"><span class="dot-ind"></span>Cash Flow</div>
+      <ul>
+        <li>TTM FCF<span class="v r">Deep negative</span></li>
+        <li>Q2 FY26 FCF<span class="v r">~−$10B</span></li>
+        <li>Capex intensity<span class="v r">Rising</span></li>
+        <li>Debt / equity financing<span class="v r">Large programs</span></li>
+        <li>Path to FCF inflection<span class="v a">Backlog-linked</span></li>
+      </ul>
+    </div>
+    <div class="card amber">
+      <div class="card-title"><span class="dot-ind"></span>AI &amp; Execution</div>
+      <ul>
+        <li>Hyperscale AI demand<span class="v g">OpenAI / mega-RPO</span></li>
+        <li>Data-center delivery<span class="v a">Abilene optics</span></li>
+        <li>Competition<span class="v a">AMZN / MSFT / GOOG</span></li>
+        <li>Concentration / key clients<span class="v a">Whale exposure</span></li>
+        <li>Operational complexity<span class="v r">10GW+ roadmap</span></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="breakdown">
+    <h3>Score Breakdown &middot; Weighted Components</h3>
+    <div class="bar-row">
+      <div class="bar-label">Valuation <span style="color:var(--text-muted);font-size:.7rem">(35%)</span></div>
+      <div class="bar-track">
+        <div class="bar-fill" style="width:49%;background:linear-gradient(90deg,var(--amber),#ffd54f)"></div>
+      </div>
+      <div class="bar-num" style="color:var(--amber)">17 / 35</div>
+    </div>
+    <div class="bar-row">
+      <div class="bar-label">Financial Health <span style="color:var(--text-muted);font-size:.7rem">(35%)</span></div>
+      <div class="bar-track">
+        <div class="bar-fill" style="width:77%;background:linear-gradient(90deg,var(--red),#ff8a65)"></div>
+      </div>
+      <div class="bar-num" style="color:var(--red)">27 / 35</div>
+    </div>
+    <div class="bar-row">
+      <div class="bar-label">Growth <span style="color:var(--text-muted);font-size:.7rem">(30%)</span></div>
+      <div class="bar-track">
+        <div class="bar-fill" style="width:33%;background:linear-gradient(90deg,var(--green),#69f0ae)"></div>
+      </div>
+      <div class="bar-num" style="color:var(--green)">10 / 30</div>
+    </div>
+    <div style="text-align:right;font-family:var(--mono);font-size:.85rem;color:var(--text);margin-top:8px;padding-right:0">
+      Composite Score: <span style="color:var(--amber);font-weight:700;font-size:1rem">54 / 100</span>
+      <span style="color:var(--text-muted);font-size:.72rem;margin-left:8px">Higher = Higher Risk</span>
+    </div>
+  </div>
+
+  <div class="report-footer">
+    Report generated April 14, 2026 &middot; Data sources: Oracle IR, CNBC, LSEG/StreetAccount, public filings &middot; Not investment advice
+  </div>
+</div>
+
+<div class="page" id="page2">
+
+  <div style="display:flex;align-items:baseline;gap:16px;margin-bottom:28px">
+    <span style="font-family:var(--mono);font-size:1.3rem;font-weight:700">ORCL</span>
+    <span style="font-size:.85rem;color:var(--text-dim)">Risk Report — Page 2 of 2</span>
+    <span style="margin-left:auto;font-family:var(--mono);font-size:.75rem;color:var(--text-muted)">14 APR 2026 · 20:54 CET</span>
+  </div>
+
+  <div class="section-title">Quarterly Financial Trends (Fiscal)</div>
+  <table class="qtable">
+    <thead>
+      <tr>
+        <th>Metric</th>
+        <th>Q4 FY25</th>
+        <th>Q1 FY26</th>
+        <th>Q2 FY26</th>
+        <th>Q3 FY26</th>
+        <th style="color:var(--cyan)">Q4 FY26 (Est.)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Total Revenue ($B)</td>
+        <td>15.9</td>
+        <td>14.9</td>
+        <td>16.06</td>
+        <td style="color:var(--green)">17.19</td>
+        <td style="color:var(--text-muted)">~19.0</td>
+      </tr>
+      <tr>
+        <td>Cloud Revenue ($B)</td>
+        <td>6.7</td>
+        <td>7.2</td>
+        <td>7.98</td>
+        <td style="color:var(--green)">8.9</td>
+        <td style="color:var(--text-muted)">~9.8</td>
+      </tr>
+      <tr>
+        <td>Non-GAAP EPS</td>
+        <td>$1.70</td>
+        <td>$1.47</td>
+        <td style="color:var(--amber)">$2.26*</td>
+        <td style="color:var(--green)">$1.79</td>
+        <td style="color:var(--text-muted)">$1.92–1.96</td>
+      </tr>
+      <tr>
+        <td>RPO ($B)</td>
+        <td>138</td>
+        <td style="color:var(--green)">455</td>
+        <td style="color:var(--green)">523</td>
+        <td style="color:var(--green)">553</td>
+        <td style="color:var(--text-muted)">—</td>
+      </tr>
+      <tr>
+        <td>Revenue vs. Street</td>
+        <td style="color:var(--green)">Beat</td>
+        <td style="color:var(--green)">Beat</td>
+        <td style="color:var(--red)">Light vs. $16.21B</td>
+        <td style="color:var(--green)">Beat $16.91B</td>
+        <td style="color:var(--text-muted)">TBD</td>
+      </tr>
+      <tr>
+        <td>FCF (quarter, $B)</td>
+        <td style="color:var(--amber)">Neg.</td>
+        <td style="color:var(--amber)">Neg.</td>
+        <td style="color:var(--red)">~−10.0</td>
+        <td style="color:var(--amber)">Neg.</td>
+        <td style="color:var(--text-muted)">TBD</td>
+      </tr>
+    </tbody>
+  </table>
+  <p style="font-family:var(--mono);font-size:.65rem;color:var(--text-muted);margin:-28px 0 36px;line-height:1.45">*Q2 FY26 adjusted EPS includes a material pre-tax gain on the Ampere stake sale (~$2.7B pre-tax) per Oracle&rsquo;s Q2 FY26 statement.</p>
+
+  <div class="earnings-box">
+    <h4>Latest Earnings &amp; Delivery Update</h4>
+    <p>
+      <strong>Q3 FY26 (ended Feb 28, 2026)</strong> — Oracle reported <strong>$17.19B</strong> revenue (+22% YoY) vs. ~$16.91B consensus, and <strong>non-GAAP EPS $1.79</strong> vs. $1.70 expected. Cloud revenue reached <strong>$8.9B</strong> (+44%), with cloud infrastructure (IaaS) <strong>$4.9B</strong> (+84%). RPO jumped to <strong>~$553B</strong> (+325% YoY). Management raised the FY27 revenue outlook by <strong>$1B to ~$90B</strong> and guided Q4 non-GAAP EPS <strong>$1.92–$1.96</strong> on ~19–20% revenue growth. The company also outlined up to <strong>$45–50B</strong> in calendar-2026 financing to expand AI capacity while noting customer prepayments and bring-your-own-GPU structures can limit incremental borrowing. Media volatility around the Abilene Stargate campus was followed by Oracle stating two buildings are live and the remainder is on track. Next major print: <span class="highlight-date">Q4 FY26 (~mid-June 2026)</span> — focus on capex cadence, FCF trajectory, and RPO conversion.
+    </p>
+  </div>
+
+  <div class="dual">
+    <div class="dual-col catalysts">
+      <h4><span class="ic">▲</span> Catalysts</h4>
+      <ul>
+        <li><strong>Record AI backlog</strong> — RPO near $553B underpins multi-year revenue visibility if execution holds.</li>
+        <li><strong>IaaS re-acceleration</strong> — +84% YoY in Q3 signals capacity coming online for hyperscale workloads.</li>
+        <li><strong>FY27 guide lift</strong> — ~$90B revenue target resets Street scale assumptions for cloud mix.</li>
+        <li><strong>Customer-funded models</strong> — prepayments and supplier leases can improve cash timing vs. worst-case debt models.</li>
+        <li><strong>Database multicloud tailwind</strong> — Oracle positions OCI + Autonomous DB as neutral layer across AWS, Azure, and GCP.</li>
+        <li><strong>AI agent suite expansion</strong> — new automation SKUs across ERP/HCM/CRM can lift SaaS attach over time.</li>
+      </ul>
+    </div>
+    <div class="dual-col risks">
+      <h4><span class="ic">▼</span> Risks</h4>
+      <ul>
+        <li><strong>Negative FCF</strong> — ~$13B TTM cash burn as Oracle outspends depreciation to win AI land grabs.</li>
+        <li><strong>Financing dilution</strong> — large equity/debt programs could pressure EPS if cloud yields lag.</li>
+        <li><strong>Concentration</strong> — outsized commitments from a handful of AI customers raise renewal/cliff risk.</li>
+        <li><strong>Competitive cap intensity</strong> — AWS, Azure, and GCP can match price/performance on GPUs and regions.</li>
+        <li><strong>Execution / optics</strong> — data-center headlines (e.g., Abilene) can whipsaw sentiment even when fundamentals beat.</li>
+        <li><strong>Margin mix</strong> — renting GPUs is structurally lower margin than classic database software — multiple compression risk if growth slows.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="bottom-line">
+    <h3>Bottom Line</h3>
+    <p>
+      Oracle is one of the clearest AI-infrastructure beneficiaries in software, with cloud re-acceleration and a staggering RPO book that supports a bullish multi-year revenue path. The offset is balance-sheet stress: heavy capex, deeply negative free cash flow, and large capital raises mean the equity behaves like a levered play on AI demand. After a &gt;50% drawdown from the 2025 peak, valuation is no longer euphoric on forward earnings, but the stock will remain volatile around financing headlines and quarter-to-quarter FCF. Position sizing should reflect financing and customer-concentration tail risks, not just top-line momentum.
+    </p>
+    <div class="rating-bar">
+      <div class="segments">
+        <div class="seg"></div>
+        <div class="seg"></div>
+        <div class="seg active-a"></div>
+        <div class="seg active-a"></div>
+        <div class="seg active-a"></div>
+        <div class="seg active-a"></div>
+        <div class="seg active-a"></div>
+        <div class="seg active-g"></div>
+        <div class="seg active-g"></div>
+        <div class="seg"></div>
+      </div>
+      <div class="verdict">HOLD — FINANCING RISK</div>
+    </div>
+    <div class="rating-labels">
+      <span>Strong Buy</span>
+      <span>Buy</span>
+      <span>Hold</span>
+      <span>Sell</span>
+      <span>Strong Sell</span>
+    </div>
+  </div>
+
+  <div class="report-footer">
+    Report generated April 14, 2026 &middot; Sources: Oracle IR, CNBC, LSEG/StreetAccount, company statements &middot; Not investment advice &middot; Past performance ≠ future results
+  </div>
+</div>
+
+<button class="copy-btn" onclick="copyReport()">📋 Copy to Clipboard</button>
+
+<script>
+function copyReport(){
+  const text = [];
+  text.push('ORCL RISK SCORE REPORT — April 14, 2026 · 20:54 CET');
+  text.push('═'.repeat(50));
+  text.push('Price: $161.93 | YTD: -23.0% | Mkt Cap: ~$465B');
+  text.push('52-Week: $121.24 – $345.72 | P/E (TTM): ~29.5×');
+  text.push('');
+  text.push('RISK SCORE: 54/100 — Elevated Risk (AI scale vs. balance sheet)');
+  text.push('  Valuation:       17/35 (Moderate risk)');
+  text.push('  Financial Health: 27/35 (High risk — leverage / negative FCF)');
+  text.push('  Growth:          10/30 (Lower risk — cloud + RPO)');
+  text.push('');
+  text.push('KEY METRICS');
+  text.push('  Q3 FY26 Revenue: $17.19B (+22% YoY) — beat');
+  text.push('  Q3 FY26 Cloud: $8.9B (+44% YoY); IaaS $4.9B (+84%)');
+  text.push('  Non-GAAP EPS Q3: $1.79 vs. $1.70 cons.');
+  text.push('  RPO: ~$553B (+325% YoY)');
+  text.push('  TTM Free Cash Flow: ~−$13.2B (CapEx-heavy)');
+  text.push('  FY27 revenue outlook: ~$90B (raised)');
+  text.push('');
+  text.push('VERDICT: HOLD — FINANCING RISK');
+  text.push('Next earnings: Q4 FY26 (~mid-June 2026)');
+  text.push('');
+  text.push('Not investment advice.');
+
+  navigator.clipboard.writeText(text.join('\n')).then(()=>{
+    const btn = document.querySelector('.copy-btn');
+    btn.textContent = '✓ Copied!';
+    btn.style.background = '#00e676';
+    btn.style.color = '#08090d';
+    btn.style.borderColor = '#00e676';
+    setTimeout(()=>{
+      btn.textContent = '📋 Copy to Clipboard';
+      btn.style.background = '';
+      btn.style.color = '';
+      btn.style.borderColor = '';
+    }, 2000);
+  });
+}
+</script>
+
+</body>
+</html>
