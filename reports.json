@@ -9,6 +9,9 @@
     "changeDir": "neg",
     "riskScore": 62,
     "verdict": "HOLD — ELEVATED RISK",
+    "signal": "hold",
+    "gaugeNumColor": "amber",
+    "verdictColor": "amber",
     "file": "reports/PLTR_2026-04-14T2039.html"
   },
   {
@@ -21,6 +24,9 @@
     "changeDir": "neg",
     "riskScore": 66,
     "verdict": "HOLD — HIGH RISK",
+    "signal": "hold",
+    "gaugeNumColor": "amber",
+    "verdictColor": "amber",
     "file": "reports/TSLA_2026-04-14T1342.html"
   }
 ]

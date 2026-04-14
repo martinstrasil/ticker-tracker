@@ -111,6 +111,12 @@ footer{text-align:center;padding:40px 0 0;font-size:.65rem;color:var(--text-mute
       <option value="30">Last 30 days</option>
       <option value="90">Last 90 days</option>
     </select>
+    <select class="filter-input" id="signalFilter">
+      <option value="all">All signals</option>
+      <option value="buy">Buy</option>
+      <option value="hold">Hold</option>
+      <option value="sell">Sell</option>
+    </select>
     <span class="filter-count" id="countLabel"></span>
   </div>
 
@@ -124,10 +130,17 @@ footer{text-align:center;padding:40px 0 0;font-size:.65rem;color:var(--text-mute
 <script>
 let allReports = [];
 
-function riskColor(score) {
-  if (score <= 35) return "var(--green)";
-  if (score <= 65) return "var(--amber)";
-  return "var(--red)";
+const COLOR_TOKENS = new Set(["green", "amber", "red", "cyan", "blue"]);
+
+/**
+ * Map a token from reports.json to a theme CSS variable.
+ * @param {string|undefined} token - e.g. `green`, `cyan`
+ * @param {string} fallback - default token if missing or unknown
+ * @returns {string} `var(--name)`
+ */
+function colorVar(token, fallback) {
+  const t = typeof token === "string" && COLOR_TOKENS.has(token.toLowerCase()) ? token.toLowerCase() : fallback;
+  return `var(--${t})`;
 }
 
 function verdictDots(score) {
@@ -145,21 +158,39 @@ function verdictDots(score) {
   return html;
 }
 
-function gaugeArc(score) {
-  const radius = 28;
-  const circumference = Math.PI * radius;
-  const pct = score / 100;
-  const dashoffset = circumference * (1 - pct);
-  const color = riskColor(score);
-
-  return `<svg viewBox="0 0 72 72">
-    <circle cx="36" cy="36" r="${radius}" fill="none" stroke="var(--surface2)" stroke-width="5"
-      stroke-dasharray="${circumference}" stroke-dashoffset="${circumference / 2}"
-      transform="rotate(180 36 36)" stroke-linecap="round"/>
-    <circle cx="36" cy="36" r="${radius}" fill="none" stroke="${color}" stroke-width="5"
-      stroke-dasharray="${circumference}" stroke-dashoffset="${circumference / 2 + dashoffset}"
-      transform="rotate(180 36 36)" stroke-linecap="round" opacity=".85"/>
+/**
+ * Semicircle risk arc matching child reports: green→amber→red gradient, dashoffset from score.
+ * @param {number} score - Risk score 0–100
+ * @param {string} gradBaseId - Unique id prefix (valid for SVG id)
+ * @returns {string} SVG markup
+ */
+function gaugeArcGradient(score, gradBaseId) {
+  const clamped = Math.max(0, Math.min(100, Number(score) || 0));
+  const dashoffset = Math.round(251 * (1 - clamped / 100));
+  return `<svg viewBox="0 0 200 120" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+    <defs>
+      <linearGradient id="${gradBaseId}-bg" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="#1a1e2a"/>
+        <stop offset="100%" stop-color="#1a1e2a"/>
+      </linearGradient>
+      <linearGradient id="${gradBaseId}-arc" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="#00e676"/>
+        <stop offset="40%" stop-color="#ffab40"/>
+        <stop offset="100%" stop-color="#ff5252"/>
+      </linearGradient>
+    </defs>
+    <path d="M 20 105 A 80 80 0 0 1 180 105" fill="none" stroke="url(#${gradBaseId}-bg)" stroke-width="12" stroke-linecap="round"/>
+    <path d="M 20 105 A 80 80 0 0 1 180 105" fill="none" stroke="url(#${gradBaseId}-arc)" stroke-width="12" stroke-linecap="round" stroke-dasharray="251" stroke-dashoffset="${dashoffset}" opacity=".9"/>
   </svg>`;
+}
+
+/**
+ * Stable SVG gradient id for a report tile.
+ * @param {{ticker:string,date:string,time:string}} r - Report row
+ * @returns {string}
+ */
+function gaugeGradientId(r) {
+  return `gg-${r.ticker}-${r.date.replace(/-/g, "")}-${String(r.time || "").replace(":", "")}`;
 }
 
 function formatDate(dateStr) {
@@ -168,7 +199,9 @@ function formatDate(dateStr) {
 }
 
 function renderTile(r) {
-  const color = riskColor(r.riskScore);
+  const numColor = colorVar(r.gaugeNumColor, "amber");
+  const verdictTone = colorVar(r.verdictColor ?? r.gaugeNumColor, "amber");
+  const gid = gaugeGradientId(r);
   const changeClass = r.changeDir === "pos" ? "pos" : "neg";
 
   return `<a class="tile" href="${r.file}" data-ticker="${r.ticker}" data-date="${r.date}">
@@ -179,8 +212,8 @@ function renderTile(r) {
     </div>
     <div class="tile-body">
       <div class="tile-gauge">
-        ${gaugeArc(r.riskScore)}
-        <span class="gauge-val" style="color:${color}">${r.riskScore}</span>
+        ${gaugeArcGradient(r.riskScore, gid)}
+        <span class="gauge-val" style="color:${numColor}">${r.riskScore}</span>
         <span class="gauge-label">Risk</span>
       </div>
       <div class="tile-metrics">
@@ -196,7 +229,7 @@ function renderTile(r) {
     </div>
     <div class="tile-verdict">
       <div class="verdict-dots">${verdictDots(r.riskScore)}</div>
-      <span class="verdict-text" style="color:${color}">${r.verdict}</span>
+      <span class="verdict-text" style="color:${verdictTone}">${r.verdict}</span>
     </div>
   </a>`;
 }
@@ -223,6 +256,7 @@ function render(reports) {
 function applyFilters() {
   const ticker = document.getElementById("tickerFilter").value.toUpperCase().trim();
   const dateDays = document.getElementById("dateFilter").value;
+  const signal = document.getElementById("signalFilter").value;
 
   let filtered = allReports;
 
@@ -237,6 +271,10 @@ function applyFilters() {
     filtered = filtered.filter((r) => r.date >= cutoffStr);
   }
 
+  if (signal !== "all") {
+    filtered = filtered.filter((r) => (r.signal || "hold") === signal);
+  }
+
   render(filtered);
 }
 
@@ -247,6 +285,7 @@ async function init() {
 
   document.getElementById("tickerFilter").addEventListener("input", applyFilters);
   document.getElementById("dateFilter").addEventListener("change", applyFilters);
+  document.getElementById("signalFilter").addEventListener("change", applyFilters);
 }
 
 init();

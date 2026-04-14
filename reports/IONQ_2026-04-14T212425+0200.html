@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IONQ Risk Score Report — April 2026</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#08090d;--surface:#0e1017;--surface2:#141720;--surface3:#1a1e2a;
+    --border:#1e2330;--border-light:#2a3040;
+    --text:#e8eaf0;--text-dim:#8890a4;--text-muted:#565e74;
+    --green:#00e676;--green-dim:#00e67620;--green-bg:#0a2618;
+    --red:#ff5252;--red-dim:#ff525220;--red-bg:#2a0e0e;
+    --amber:#ffab40;--amber-dim:#ffab4020;--amber-bg:#2a1e0a;
+    --gold:#ffc107;--gold-dim:#ffc10718;
+    --cyan:#18ffff;
+    --mono:'JetBrains Mono',monospace;
+    --sans:'DM Sans',sans-serif;
+    --page-w:1080px;
+  }
+  html{font-size:14px}
+  body{background:var(--bg);color:var(--text);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
+
+  .page{max-width:var(--page-w);margin:0 auto;padding:48px 40px;min-height:100vh;position:relative}
+  .page+.page{border-top:1px solid var(--border)}
+  .page::before{content:'';position:absolute;top:0;left:0;right:0;height:260px;background:linear-gradient(180deg,#18ffff08 0%,transparent 100%);pointer-events:none}
+
+  @media print{.page{page-break-before:always;padding:24px}}
+
+  .stock-bar{display:flex;align-items:center;gap:20px;padding:16px 24px;background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:32px;position:relative;overflow:hidden}
+  .stock-bar::after{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--cyan),transparent)}
+  .stock-bar .ticker{font-family:var(--mono);font-size:1.7rem;font-weight:700;letter-spacing:-.02em;color:var(--text)}
+  .stock-bar .company{font-size:.95rem;color:var(--text-dim);margin-left:-8px}
+  .stock-bar .price-block{margin-left:auto;text-align:right}
+  .stock-bar .price{font-family:var(--mono);font-size:1.6rem;font-weight:600}
+  .stock-bar .change{font-family:var(--mono);font-size:.85rem;padding:3px 10px;border-radius:6px;display:inline-block;margin-top:2px}
+  .stock-bar .change.neg{color:var(--red);background:var(--red-dim)}
+  .stock-bar .change.pos{color:var(--green);background:var(--green-dim)}
+  .stock-bar .meta{font-family:var(--mono);font-size:.75rem;color:var(--text-muted);display:flex;flex-direction:column;gap:2px;min-width:200px}
+  .stock-bar .dot{width:8px;height:8px;border-radius:50%;background:var(--cyan);box-shadow:0 0 8px var(--cyan);animation:pulse 2s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+  .gauge-row{display:flex;align-items:center;gap:40px;margin-bottom:36px}
+  .gauge-wrap{width:220px;flex-shrink:0;position:relative}
+  .gauge-wrap svg{width:100%;display:block}
+  .gauge-label{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);text-align:center}
+  .gauge-label .num{font-family:var(--mono);font-size:2.8rem;font-weight:700;line-height:1;color:var(--amber)}
+  .gauge-label .sub{font-size:.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.12em;margin-top:2px}
+  .score-desc{flex:1}
+  .score-desc h2{font-size:1.1rem;font-weight:600;margin-bottom:6px;color:var(--amber)}
+  .score-desc p{font-size:.88rem;color:var(--text-dim);line-height:1.6;max-width:540px}
+
+  .kpi-strip{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:36px}
+  .kpi{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;position:relative;overflow:hidden}
+  .kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+  .kpi.g::before{background:var(--green)}.kpi.r::before{background:var(--red)}.kpi.a::before{background:var(--amber)}.kpi.b::before{background:var(--cyan)}
+  .kpi .label{font-size:.65rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);margin-bottom:6px}
+  .kpi .val{font-family:var(--mono);font-size:1.15rem;font-weight:600}
+  .kpi .sub{font-family:var(--mono);font-size:.7rem;color:var(--text-muted);margin-top:2px}
+
+  .chart-section{margin-bottom:36px}
+  .chart-section h3{font-size:.75rem;text-transform:uppercase;letter-spacing:.12em;color:var(--text-muted);margin-bottom:12px}
+  .chart-box{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px 24px 16px;position:relative;overflow:hidden}
+  .chart-box svg{width:100%;display:block}
+
+  .pillar-tag{font-size:.62rem;text-transform:uppercase;letter-spacing:.14em;color:var(--text-muted);margin:8px 0 10px}
+  .card-grid-2{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-bottom:22px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px 20px;position:relative;overflow:hidden}
+  .card::before{content:'';position:absolute;top:0;left:0;width:3px;height:100%;border-radius:0 3px 3px 0}
+  .card.green::before{background:var(--green)}.card.red::before{background:var(--red)}.card.amber::before{background:var(--amber)}
+  .card .card-title{font-size:.7rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);margin-bottom:10px;display:flex;align-items:center;gap:8px}
+  .card .card-title .dot-ind{width:6px;height:6px;border-radius:50%}
+  .card.green .dot-ind{background:var(--green)}.card.red .dot-ind{background:var(--red)}.card.amber .dot-ind{background:var(--amber)}
+  .card ul{list-style:none;padding:0}
+  .card li{font-size:.82rem;color:var(--text-dim);padding:4px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+  .card li:last-child{border:none}
+  .card li .v{font-family:var(--mono);font-weight:500;font-size:.8rem}
+  .card li .v.g{color:var(--green)}.card li .v.r{color:var(--red)}.card li .v.a{color:var(--amber)}
+
+  .breakdown{margin-bottom:16px}
+  .breakdown h3{font-size:.75rem;text-transform:uppercase;letter-spacing:.12em;color:var(--text-muted);margin-bottom:14px}
+  .bar-row{display:flex;align-items:center;gap:14px;margin-bottom:10px}
+  .bar-row .bar-label{font-size:.8rem;color:var(--text-dim);width:160px;flex-shrink:0}
+  .bar-row .bar-track{flex:1;height:10px;background:var(--surface2);border-radius:5px;overflow:hidden;position:relative}
+  .bar-row .bar-fill{height:100%;border-radius:5px;position:relative}
+  .bar-row .bar-fill::after{content:'';position:absolute;top:0;right:0;bottom:0;width:40%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.12))}
+  .bar-row .bar-num{font-family:var(--mono);font-size:.8rem;font-weight:600;width:60px;text-align:right;flex-shrink:0}
+
+  .qtable{width:100%;border-collapse:collapse;margin-bottom:36px;font-size:.82rem}
+  .qtable th{font-size:.65rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);font-weight:500;padding:10px 12px;text-align:right;border-bottom:1px solid var(--border-light)}
+  .qtable th:first-child{text-align:left}
+  .qtable td{font-family:var(--mono);font-weight:400;padding:10px 12px;text-align:right;border-bottom:1px solid var(--border);color:var(--text-dim)}
+  .qtable td:first-child{font-family:var(--sans);color:var(--text);text-align:left;font-weight:500}
+  .qtable tr:hover td{background:var(--surface)}
+  .qtable .highlight td{background:var(--surface2);color:var(--text)}
+
+  .dual{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:36px}
+  .dual-col{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px 22px}
+  .dual-col h4{font-size:.7rem;text-transform:uppercase;letter-spacing:.12em;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+  .dual-col h4 .ic{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.65rem}
+  .dual-col.catalysts h4{color:var(--green)}.dual-col.catalysts h4 .ic{background:var(--green-dim);color:var(--green)}
+  .dual-col.risks h4{color:var(--red)}.dual-col.risks h4 .ic{background:var(--red-dim);color:var(--red)}
+  .dual-col li{font-size:.82rem;color:var(--text-dim);padding:6px 0;border-bottom:1px solid var(--border);line-height:1.5}
+  .dual-col li:last-child{border:none}
+  .dual-col ul{list-style:none;padding:0}
+
+  .earnings-box{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px 24px;margin-bottom:36px}
+  .earnings-box h4{font-size:.7rem;text-transform:uppercase;letter-spacing:.12em;color:var(--text-muted);margin-bottom:10px}
+  .earnings-box p{font-size:.88rem;color:var(--text-dim);line-height:1.65}
+  .earnings-box .highlight-date{font-family:var(--mono);color:var(--cyan);font-weight:500}
+
+  .bottom-line{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px 28px;position:relative;overflow:hidden}
+  .bottom-line::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--red),var(--amber),var(--green))}
+  .bottom-line h3{font-size:.95rem;font-weight:600;margin-bottom:8px;color:var(--text)}
+  .bottom-line p{font-size:.88rem;color:var(--text-dim);line-height:1.65;margin-bottom:16px}
+  .rating-bar{display:flex;align-items:center;gap:16px;margin-top:14px}
+  .rating-bar .segments{display:flex;gap:3px;flex:1}
+  .rating-bar .seg{height:8px;flex:1;border-radius:4px;background:var(--surface2)}
+  .rating-bar .seg.active-r{background:var(--red)}.rating-bar .seg.active-a{background:var(--amber)}.rating-bar .seg.active-g{background:var(--green)}
+  .rating-bar .verdict{font-family:var(--mono);font-size:.95rem;font-weight:700;color:var(--amber);white-space:nowrap}
+  .rating-labels{display:flex;justify-content:space-between;margin-top:6px;font-size:.6rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted)}
+
+  .copy-btn{position:fixed;bottom:24px;right:24px;background:var(--surface2);border:1px solid var(--border-light);color:var(--text-dim);font-family:var(--mono);font-size:.75rem;padding:10px 18px;border-radius:8px;cursor:pointer;z-index:100;transition:all .2s}
+  .copy-btn:hover{background:var(--cyan);color:#08090d;border-color:var(--cyan)}
+
+  .section-title{font-size:.75rem;text-transform:uppercase;letter-spacing:.12em;color:var(--text-muted);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+
+  .report-footer{text-align:center;padding:20px 0 0;font-size:.65rem;color:var(--text-muted);border-top:1px solid var(--border);margin-top:32px}
+
+  .analysis-ts-only{font-family:var(--mono);font-size:.7rem;color:var(--text-muted);letter-spacing:.04em;text-align:right;margin-bottom:14px}
+
+  @media(max-width:800px){
+    .kpi-strip{grid-template-columns:repeat(3,1fr)}
+    .card-grid-2{grid-template-columns:1fr}
+    .dual{grid-template-columns:1fr}
+    .stock-bar{flex-wrap:wrap}
+    .gauge-row{flex-direction:column;align-items:flex-start}
+  }
+</style>
+</head>
+<body>
+
+<!-- ========== PAGE 1 ========== -->
+<div class="page" id="page1">
+
+  <div class="analysis-ts-only">2026-04-14 21:24:25 CEST</div>
+
+  <div class="stock-bar">
+    <div class="dot"></div>
+    <div>
+      <div class="ticker">IONQ</div>
+      <div class="company">IonQ, Inc. &middot; NYSE</div>
+    </div>
+    <div class="meta">
+      <span>52w <b style="color:var(--text)">$23.49 – $84.64</b></span>
+      <span>Vol (sess.) <b style="color:var(--text)">53.5M sh</b></span>
+      <span>Mkt Cap <b style="color:var(--text)">~$10.9B</b></span>
+    </div>
+    <div class="price-block">
+      <div class="price">$35.38</div>
+      <div class="change pos">+18.9% (1D)</div>
+    </div>
+  </div>
+
+  <div class="gauge-row">
+    <div class="gauge-wrap">
+      <svg viewBox="0 0 200 120" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="gaugeBg" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#1a1e2a"/>
+            <stop offset="100%" stop-color="#1a1e2a"/>
+          </linearGradient>
+          <linearGradient id="gaugeGrad" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#00e676"/>
+            <stop offset="40%" stop-color="#ffab40"/>
+            <stop offset="100%" stop-color="#ff5252"/>
+          </linearGradient>
+        </defs>
+        <path d="M 20 105 A 80 80 0 0 1 180 105" fill="none" stroke="url(#gaugeBg)" stroke-width="12" stroke-linecap="round"/>
+        <path d="M 20 105 A 80 80 0 0 1 180 105" fill="none" stroke="url(#gaugeGrad)" stroke-width="12" stroke-linecap="round" stroke-dasharray="251" stroke-dashoffset="102.9" opacity=".9"/>
+        <text x="14" y="115" font-family="JetBrains Mono" font-size="8" fill="#565e74">0</text>
+        <text x="93" y="20" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">50</text>
+        <text x="178" y="115" font-family="JetBrains Mono" font-size="8" fill="#565e74">100</text>
+        <circle cx="122" cy="28" r="4" fill="#ffab40" opacity=".95"/>
+      </svg>
+      <div class="gauge-label">
+        <div class="num">59</div>
+        <div class="sub">Risk Score</div>
+      </div>
+    </div>
+    <div class="score-desc">
+      <h2>Elevated Risk — Hyper-Growth Quantum, GAAP Still Noisy</h2>
+      <p>IonQ is posting exceptional top-line acceleration and raised 2026 revenue guidance, with a large backlog (RPO) and strong liquidity after equity raises. The equity, however, trades like a high-duration technology call: multiples are rich, GAAP earnings remain dominated by non-cash warrant/fair-value noise, and realized prices can gap sharply on sentiment (52-week range spans more than 3×). Our composite risk score sits at <strong>59/100</strong> — attractive for growth/spec sleeves, cautious for capital preservation mandates.</p>
+    </div>
+  </div>
+
+  <div class="kpi-strip">
+    <div class="kpi g">
+      <div class="label">Rev FY25</div>
+      <div class="val" style="color:var(--green)">$130.0M</div>
+      <div class="sub">+202% YoY (GAAP)</div>
+    </div>
+    <div class="kpi g">
+      <div class="label">2026 Guide</div>
+      <div class="val" style="color:var(--green)">$235M</div>
+      <div class="sub">Midpoint (mgmt.)</div>
+    </div>
+    <div class="kpi g">
+      <div class="label">RPO (YE25)</div>
+      <div class="val" style="color:var(--green)">~$370M</div>
+      <div class="sub">Visibility / backlog</div>
+    </div>
+    <div class="kpi r">
+      <div class="label">GAAP EPS (Q3)</div>
+      <div class="val" style="color:var(--red)">($3.58)</div>
+      <div class="sub">Warrant noise</div>
+    </div>
+    <div class="kpi a">
+      <div class="label">Beta (screen)</div>
+      <div class="val" style="color:var(--amber)">~2.0×</div>
+      <div class="sub">High realized vol</div>
+    </div>
+    <div class="kpi b">
+      <div class="label">Q4 Rev</div>
+      <div class="val" style="color:var(--cyan)">$61.9M</div>
+      <div class="sub">Beat vs guide</div>
+    </div>
+  </div>
+
+  <div class="chart-section">
+    <h3>12-Month Price Action &middot; IONQ (NYSE) &middot; Month-End Closes</h3>
+    <div class="chart-box">
+      <svg viewBox="0 0 1000 300" xmlns="http://www.w3.org/2000/svg" style="overflow:visible">
+        <defs>
+          <linearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#18ffff" stop-opacity=".14"/>
+            <stop offset="100%" stop-color="#18ffff" stop-opacity="0"/>
+          </linearGradient>
+          <linearGradient id="lineGrad" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#ff5252"/>
+            <stop offset="45%" stop-color="#ffab40"/>
+            <stop offset="100%" stop-color="#00e676"/>
+          </linearGradient>
+        </defs>
+        <line x1="60" y1="20" x2="60" y2="260" stroke="#1e2330" stroke-width=".5"/>
+        <line x1="60" y1="260" x2="980" y2="260" stroke="#1e2330" stroke-width=".5"/>
+        <line x1="60" y1="65" x2="980" y2="65" stroke="#1e2330" stroke-width=".5" stroke-dasharray="4"/>
+        <line x1="60" y1="130" x2="980" y2="130" stroke="#1e2330" stroke-width=".5" stroke-dasharray="4"/>
+        <line x1="60" y1="195" x2="980" y2="195" stroke="#1e2330" stroke-width=".5" stroke-dasharray="4"/>
+        <text x="50" y="24" font-family="JetBrains Mono" font-size="9" fill="#565e74" text-anchor="end">$65</text>
+        <text x="50" y="69" font-family="JetBrains Mono" font-size="9" fill="#565e74" text-anchor="end">$52</text>
+        <text x="50" y="134" font-family="JetBrains Mono" font-size="9" fill="#565e74" text-anchor="end">$40</text>
+        <text x="50" y="199" font-family="JetBrains Mono" font-size="9" fill="#565e74" text-anchor="end">$32</text>
+        <text x="50" y="264" font-family="JetBrains Mono" font-size="9" fill="#565e74" text-anchor="end">$27</text>
+        <text x="80" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">May'25</text>
+        <text x="160" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Jun'25</text>
+        <text x="240" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Jul'25</text>
+        <text x="320" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Aug'25</text>
+        <text x="400" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Sep'25</text>
+        <text x="480" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Oct'25</text>
+        <text x="560" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Nov'25</text>
+        <text x="640" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Dec'25</text>
+        <text x="720" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Jan'26</text>
+        <text x="800" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Feb'26</text>
+        <text x="880" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Mar'26</text>
+        <text x="960" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Apr'26</text>
+        <path d="M 80,176 L 160,159 240,176 320,161 400,42 480,37 560,119 640,147 720,178 800,188 880,249 960,207 L 960,260 80,260 Z" fill="url(#chartFill)"/>
+        <polyline points="80,176 160,159 240,176 320,161 400,42 480,37 560,119 640,147 720,178 800,188 880,249 960,207" fill="none" stroke="url(#lineGrad)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+
+        <circle cx="400" cy="42" r="3.5" fill="#00e676" stroke="#08090d" stroke-width="1.5"/>
+        <line x1="400" y1="42" x2="400" y2="24" stroke="#00e676" stroke-width=".8" stroke-dasharray="3"/>
+        <rect x="318" y="6" width="164" height="16" rx="4" fill="#0a2618" stroke="#00e676" stroke-width=".5"/>
+        <text x="400" y="17" font-family="JetBrains Mono" font-size="7.5" fill="#00e676" text-anchor="middle">Momentum leg (Sep)</text>
+
+        <circle cx="480" cy="37" r="4" fill="#ffab40" stroke="#08090d" stroke-width="2"/>
+        <line x1="480" y1="37" x2="480" y2="18" stroke="#ffab40" stroke-width=".8" stroke-dasharray="3"/>
+        <rect x="402" y="2" width="156" height="16" rx="4" fill="#2a1e0a" stroke="#ffab40" stroke-width=".5"/>
+        <text x="480" y="13" font-family="JetBrains Mono" font-size="7.5" fill="#ffab40" text-anchor="middle">Month-end near cycle highs</text>
+
+        <circle cx="880" cy="249" r="4" fill="#ff5252" stroke="#08090d" stroke-width="2"/>
+        <line x1="880" y1="249" x2="880" y2="266" stroke="#ff5252" stroke-width=".8" stroke-dasharray="3"/>
+        <rect x="802" y="268" width="156" height="16" rx="4" fill="#2a0e0e" stroke="#ff5252" stroke-width=".5"/>
+        <text x="880" y="279" font-family="JetBrains Mono" font-size="7.5" fill="#ff5252" text-anchor="middle">Drawdown / de-rate</text>
+
+        <circle cx="960" cy="207" r="4" fill="#18ffff" stroke="#08090d" stroke-width="2"/>
+        <line x1="960" y1="207" x2="960" y2="188" stroke="#18ffff" stroke-width=".8" stroke-dasharray="3"/>
+        <rect x="878" y="168" width="164" height="16" rx="4" fill="#0e1017" stroke="#18ffff" stroke-width=".5"/>
+        <text x="960" y="179" font-family="JetBrains Mono" font-size="7.5" fill="#18ffff" text-anchor="middle">Relief bounce (Apr)</text>
+      </svg>
+    </div>
+  </div>
+
+  <div class="section-title">Fundamental Scorecard (6 Cards)</div>
+  <div class="pillar-tag">Valuation</div>
+  <div class="card-grid-2">
+    <div class="card red">
+      <div class="card-title"><span class="dot-ind"></span>Valuation &mdash; Multiples &amp; Dilution</div>
+      <ul>
+        <li>Price / Sales (vs rev.)<span class="v r">Rich / growth-priced</span></li>
+        <li>EV context (cash-heavy)<span class="v a">Equity raises dilute</span></li>
+        <li>Profitability (GAAP)<span class="v r">Losses + warrants</span></li>
+        <li>52w drawdown from high<span class="v a">~−58% off peak</span></li>
+        <li>Peer quantum set<span class="v a">Narrative-linked</span></li>
+      </ul>
+    </div>
+    <div class="card amber">
+      <div class="card-title"><span class="dot-ind"></span>Valuation &mdash; Street &amp; Flows</div>
+      <ul>
+        <li>Analyst PT (consensus screen)<span class="v g">~$69</span></li>
+        <li>Upside vs spot<span class="v g">Material gap</span></li>
+        <li>Retail / thematic flows<span class="v a">Whiplash risk</span></li>
+        <li>Short interest<span class="v a">Elevated episodes</span></li>
+        <li>Listing liquidity (NYSE)<span class="v g">Deep when hot</span></li>
+      </ul>
+    </div>
+  </div>
+  <div class="pillar-tag">Financial Health</div>
+  <div class="card-grid-2">
+    <div class="card green">
+      <div class="card-title"><span class="dot-ind"></span>Financial Health &mdash; Liquidity</div>
+      <ul>
+        <li>Cash &amp; investments (screen)<span class="v g">Multi-$B pro-forma</span></li>
+        <li>RPO / backlog<span class="v g">~$370M (YE25)</span></li>
+        <li>Near-term maturities<span class="v g">Manageable</span></li>
+        <li>Capex intensity<span class="v a">Build-out phase</span></li>
+        <li>WC seasonality<span class="v a">Lumpy bookings</span></li>
+      </ul>
+    </div>
+    <div class="card red">
+      <div class="card-title"><span class="dot-ind"></span>Financial Health &mdash; GAAP Noise</div>
+      <ul>
+        <li>Net income (GAAP)<span class="v r">Warrant mark swings</span></li>
+        <li>Adj. EBITDA (recent Q)<span class="v r">Still investing</span></li>
+        <li>Stock comp / SBC<span class="v a">Watch dilution</span></li>
+        <li>Acquisition integration<span class="v a">Oxford Ionics / VA</span></li>
+        <li>Accounting complexity<span class="v r">Non-cash heavy</span></li>
+      </ul>
+    </div>
+  </div>
+  <div class="pillar-tag">Growth</div>
+  <div class="card-grid-2">
+    <div class="card green">
+      <div class="card-title"><span class="dot-ind"></span>Growth &mdash; Revenue &amp; Guide</div>
+      <ul>
+        <li>Q4'25 revenue<span class="v g">$61.9M (+429% YoY)</span></li>
+        <li>FY25 revenue<span class="v g">$130.0M (+202% YoY)</span></li>
+        <li>2026 revenue guide<span class="v g">$225–$245M</span></li>
+        <li>Commercial mix<span class="v g">&gt;60% FY25</span></li>
+        <li>International mix<span class="v g">&gt;30% FY25</span></li>
+      </ul>
+    </div>
+    <div class="card amber">
+      <div class="card-title"><span class="dot-ind"></span>Growth &mdash; Delivery &amp; Tech</div>
+      <ul>
+        <li>#AQ roadmap<span class="v g">#64 milestone early</span></li>
+        <li>Systems / manufacturing scale<span class="v a">Execution risk</span></li>
+        <li>Competition (hyperscale + startups)<span class="v a">Crowded narrative</span></li>
+        <li>Customer concentration<span class="v a">Monitor top accounts</span></li>
+        <li>Regulatory / export<span class="v a">Geopolitical overlay</span></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="breakdown">
+    <h3>Score Breakdown &middot; Weighted Components (35% / 35% / 30%)</h3>
+    <div class="bar-row">
+      <div class="bar-label">Valuation <span style="color:var(--text-muted);font-size:.7rem">(35%)</span></div>
+      <div class="bar-track">
+        <div class="bar-fill" style="width:78%;background:linear-gradient(90deg,var(--red),var(--amber))"></div>
+      </div>
+      <div class="bar-num" style="color:var(--amber)">27 / 35</div>
+    </div>
+    <div class="bar-row">
+      <div class="bar-label">Financial Health <span style="color:var(--text-muted);font-size:.7rem">(35%)</span></div>
+      <div class="bar-track">
+        <div class="bar-fill" style="width:46%;background:linear-gradient(90deg,var(--amber),var(--cyan))"></div>
+      </div>
+      <div class="bar-num" style="color:var(--amber)">16 / 35</div>
+    </div>
+    <div class="bar-row">
+      <div class="bar-label">Growth <span style="color:var(--text-muted);font-size:.7rem">(30%)</span></div>
+      <div class="bar-track">
+        <div class="bar-fill" style="width:53%;background:linear-gradient(90deg,var(--amber),var(--green))"></div>
+      </div>
+      <div class="bar-num" style="color:var(--amber)">16 / 30</div>
+    </div>
+    <div style="text-align:right;font-family:var(--mono);font-size:.85rem;color:var(--text);margin-top:8px;padding-right:0">
+      Composite Risk: <span style="color:var(--amber);font-weight:700;font-size:1rem">59 / 100</span>
+      <span style="color:var(--text-muted);font-size:.72rem;margin-left:8px">Higher = Higher Risk</span>
+    </div>
+  </div>
+
+  <div class="report-footer">
+    2026-04-14 21:24:25 CEST &middot; Sources: Yahoo Finance (market), IonQ IR / press (Feb 2026 FY25 &amp; guide), third-party earnings summaries &middot; Not investment advice
+  </div>
+</div>
+
+<!-- ========== PAGE 2 ========== -->
+<div class="page" id="page2">
+
+  <div style="display:flex;align-items:baseline;gap:16px;margin-bottom:28px">
+    <span style="font-family:var(--mono);font-size:1.3rem;font-weight:700">IONQ</span>
+    <span style="font-size:.85rem;color:var(--text-dim)">Risk Report — Page 2 of 2</span>
+    <span style="margin-left:auto;font-family:var(--mono);font-size:.75rem;color:var(--text-muted)">2026-04-14 21:24:25 CEST</span>
+  </div>
+
+  <div class="section-title">Quarterly Financial Trends (USD, company-reported / rounded)</div>
+  <table class="qtable">
+    <thead>
+      <tr>
+        <th>Metric</th>
+        <th>Q1 '24</th>
+        <th>Q2 '24</th>
+        <th>Q3 '24</th>
+        <th>Q4 '24</th>
+        <th>Q1 '25</th>
+        <th>Q2 '25</th>
+        <th>Q3 '25</th>
+        <th style="color:var(--cyan)">Q4 '25</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="highlight">
+        <td>Revenue ($M)</td>
+        <td>7.6</td>
+        <td>11.4</td>
+        <td>12.4</td>
+        <td>11.7</td>
+        <td style="color:var(--green)">7.6</td>
+        <td style="color:var(--green)">20.7</td>
+        <td style="color:var(--green)">39.9</td>
+        <td style="color:var(--green)">61.9</td>
+      </tr>
+      <tr>
+        <td>YoY Rev Growth</td>
+        <td>—</td>
+        <td>—</td>
+        <td>—</td>
+        <td>—</td>
+        <td>Flat</td>
+        <td style="color:var(--green)">+81.6%</td>
+        <td style="color:var(--green)">+222%</td>
+        <td style="color:var(--green)">+429%</td>
+      </tr>
+      <tr>
+        <td>GAAP EPS (dil.)</td>
+        <td style="color:var(--text-muted)">n/m</td>
+        <td style="color:var(--text-muted)">n/m</td>
+        <td style="color:var(--text-muted)">n/m</td>
+        <td style="color:var(--text-muted)">n/m</td>
+        <td style="color:var(--text-muted)">n/m</td>
+        <td style="color:var(--text-muted)">n/m</td>
+        <td style="color:var(--red)">($3.58)</td>
+        <td style="color:var(--amber)">Warrant-heavy</td>
+      </tr>
+      <tr>
+        <td>Commercial mix (FY)</td>
+        <td>—</td>
+        <td>—</td>
+        <td>—</td>
+        <td>—</td>
+        <td colspan="3" style="text-align:center">FY25: &gt;60% commercial</td>
+        <td style="color:var(--green)">Intl &gt;30%</td>
+      </tr>
+      <tr>
+        <td>Mgmt. FY revenue guide</td>
+        <td>—</td>
+        <td>—</td>
+        <td>—</td>
+        <td>$43.1M act.</td>
+        <td colspan="3" style="text-align:center">Raised through year</td>
+        <td style="color:var(--green)">$130.0M act.</td>
+      </tr>
+      <tr>
+        <td>2026 revenue guide</td>
+        <td>—</td>
+        <td>—</td>
+        <td>—</td>
+        <td>—</td>
+        <td colspan="4" style="text-align:center;color:var(--cyan)">$225M – $245M (mid ~$235M)</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="earnings-box">
+    <h4>Latest Earnings / Delivery Update</h4>
+    <p>
+      IonQ reported <strong>Q4 and full-year 2025</strong> results (press/IR, <span class="highlight-date">Feb 2026</span>): <strong>Q4 revenue ~$61.9M</strong> (~55% above the prior guidance midpoint; ~429% YoY), <strong>FY25 GAAP revenue $130.0M</strong> (~202% YoY; ~20% above prior full-year guidance). Management guided <strong>2026 revenue to $225–$245M</strong> (midpoint ~$235M, ~81% YoY at midpoint) and highlighted <strong>RPO ~$370M</strong> at year-end alongside continued commercial traction. Near-term delivery focus: <strong>Q1'26 guide $48–$51M</strong>, scaling systems revenue, and integrating recent acquisitions while navigating GAAP volatility from warrant/fair-value accounting.
+    </p>
+  </div>
+
+  <div class="dual">
+    <div class="dual-col catalysts">
+      <h4><span class="ic">▲</span> Catalysts</h4>
+      <ul>
+        <li><strong>Revenue inflection</strong> — multi-quarter beats; FY25 $130M with aggressive 2026 guide</li>
+        <li><strong>Backlog / RPO</strong> — ~$370M RPO improves forward revenue visibility</li>
+        <li><strong>Liquidity</strong> — large pro-forma cash after equity raises funds roadmap &amp; M&amp;A</li>
+        <li><strong>Technical milestones</strong> — #AQ 64 delivered ahead of schedule (2025 update cycle)</li>
+        <li><strong>Commercial mix</strong> — majority revenue from commercial customers; international &gt;30% (FY25)</li>
+        <li><strong>Sell-side gap</strong> — consensus PT screens materially above spot if execution persists</li>
+      </ul>
+    </div>
+    <div class="dual-col risks">
+      <h4><span class="ic">▼</span> Risks</h4>
+      <ul>
+        <li><strong>Valuation &amp; duration</strong> — growth multiple can compress sharply on rates/sentiment</li>
+        <li><strong>GAAP noise</strong> — large non-cash warrant / fair-value swings distort TTM EPS</li>
+        <li><strong>Volatility</strong> — 52-week range $23.49–$84.64 (Yahoo meta) implies gap risk</li>
+        <li><strong>Execution</strong> — manufacturing scale, integration, and customer concentration</li>
+        <li><strong>Competition</strong> — hyperscalers + well-funded peers on metrics/narrative</li>
+        <li><strong>Regulation</strong> — export controls / geopolitics on quantum hardware paths</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="bottom-line">
+    <h3>Bottom Line</h3>
+    <p>
+      IonQ is one of the clearest <strong>revenue growth stories</strong> in public quantum computing: prints are beating guidance, the 2026 outlook is aggressive but directionally consistent with RPO, and the balance sheet is <strong>fortress-like</strong> for a pre-profit platform. The catch is classic <strong>high-beta growth equity</strong>: GAAP earnings remain messy, the stock can re-rate both ways on sparse operating datapoints, and the Street’s upside case embeds sustained flawless execution. With composite <strong>risk at 59/100</strong>, we skew <strong>Hold / cautious accumulate</strong> for long horizons — size smaller, prefer staggered entries, and pair with strict risk budgets.
+    </p>
+    <div class="rating-bar">
+      <div class="segments">
+        <div class="seg"></div>
+        <div class="seg"></div>
+        <div class="seg"></div>
+        <div class="seg active-a"></div>
+        <div class="seg active-a"></div>
+        <div class="seg active-a"></div>
+        <div class="seg active-a"></div>
+        <div class="seg active-g"></div>
+        <div class="seg active-g"></div>
+        <div class="seg"></div>
+      </div>
+      <div class="verdict">HOLD — RISK-BUDGET GROWTH</div>
+    </div>
+    <div class="rating-labels">
+      <span>Strong Buy</span>
+      <span>Buy</span>
+      <span>Hold</span>
+      <span>Sell</span>
+      <span>Strong Sell</span>
+    </div>
+  </div>
+
+  <div class="report-footer">
+    2026-04-14 21:24:25 CEST &middot; Not investment advice &middot; Data snapshots can lag live markets
+  </div>
+</div>
+
+<button class="copy-btn" type="button" onclick="copyReport()">Copy to Clipboard</button>
+
+<script>
+function copyReport(){
+  const text = [];
+  text.push('IONQ (IonQ, Inc.) RISK SCORE REPORT — 2026-04-14 21:24:25 CEST');
+  text.push('═'.repeat(52));
+  text.push('Price: $35.38 | Day: +18.9% | Mkt Cap ~$10.9B');
+  text.push('52-Week (Yahoo meta): $23.49 – $84.64 | Vol ~53.5M sh');
+  text.push('');
+  text.push('RISK SCORE: 59/100 — Elevated / High-Beta Growth');
+  text.push('  Valuation (35%):        27/35');
+  text.push('  Financial Health (35%): 16/35');
+  text.push('  Growth (30%):           16/30');
+  text.push('');
+  text.push('KEY FACTS');
+  text.push('  FY25 Revenue: $130.0M (+202% YoY)');
+  text.push('  Q4\'25 Revenue: $61.9M | 2026 Guide: $225–$245M (mid ~$235M)');
+  text.push('  RPO (YE25): ~$370M');
+  text.push('');
+  text.push('VERDICT: HOLD — RISK-BUDGET GROWTH');
+  text.push('');
+  text.push('Not investment advice.');
+  navigator.clipboard.writeText(text.join('\n')).then(()=>{
+    const btn = document.querySelector('.copy-btn');
+    btn.textContent = 'Copied';
+    btn.style.background = '#00e676';
+    btn.style.color = '#08090d';
+    btn.style.borderColor = '#00e676';
+    setTimeout(()=>{
+      btn.textContent = 'Copy to Clipboard';
+      btn.style.background = '';
+      btn.style.color = '';
+      btn.style.borderColor = '';
+    }, 2000);
+  });
+}
+</script>
+
+</body>
+</html>

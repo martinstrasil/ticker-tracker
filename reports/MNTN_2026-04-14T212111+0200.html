@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MNTN Risk Score Report</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#08090d;--surface:#0e1017;--surface2:#141720;--surface3:#1a1e2a;
+    --border:#1e2330;--border-light:#2a3040;
+    --text:#e8eaf0;--text-dim:#8890a4;--text-muted:#565e74;
+    --green:#00e676;--green-dim:#00e67620;--green-bg:#0a2618;
+    --red:#ff5252;--red-dim:#ff525220;--red-bg:#2a0e0e;
+    --amber:#ffab40;--amber-dim:#ffab4020;--amber-bg:#2a1e0a;
+    --blue:#448aff;--blue-dim:#448aff20;
+    --cyan:#18ffff;
+    --mono:'JetBrains Mono',monospace;
+    --sans:'DM Sans',sans-serif;
+    --page-w:1080px;
+  }
+  html{font-size:14px}
+  body{background:var(--bg);color:var(--text);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
+
+  .page{max-width:var(--page-w);margin:0 auto;padding:48px 40px;min-height:100vh;position:relative}
+  .page+.page{border-top:1px solid var(--border)}
+  .page::before{content:'';position:absolute;top:0;left:0;right:0;height:260px;background:linear-gradient(180deg,#18ffff08 0%,transparent 100%);pointer-events:none}
+
+  @media print{.page{page-break-before:always;padding:24px}}
+
+  .ts-only{display:flex;justify-content:flex-end;margin-bottom:14px;font-family:var(--mono);font-size:.7rem;color:var(--text-muted);letter-spacing:.04em}
+
+  .stock-bar{display:flex;align-items:center;gap:20px;padding:16px 24px;background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:32px;position:relative;overflow:hidden}
+  .stock-bar::after{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--cyan),transparent)}
+  .stock-bar .ticker{font-family:var(--mono);font-size:1.7rem;font-weight:700;letter-spacing:-.02em;color:var(--text)}
+  .stock-bar .company{font-size:.95rem;color:var(--text-dim);margin-left:-8px}
+  .stock-bar .price-block{margin-left:auto;text-align:right}
+  .stock-bar .price{font-family:var(--mono);font-size:1.6rem;font-weight:600}
+  .stock-bar .change{font-family:var(--mono);font-size:.85rem;padding:3px 10px;border-radius:6px;display:inline-block;margin-top:2px}
+  .stock-bar .change.neg{color:var(--red);background:var(--red-dim)}
+  .stock-bar .change.pos{color:var(--green);background:var(--green-dim)}
+  .stock-bar .meta{font-family:var(--mono);font-size:.75rem;color:var(--text-muted);display:flex;flex-direction:column;gap:2px;min-width:160px}
+  .stock-bar .dot{width:8px;height:8px;border-radius:50%;background:var(--amber);box-shadow:0 0 8px var(--amber);animation:pulse 2s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+  .gauge-row{display:flex;align-items:center;gap:40px;margin-bottom:36px}
+  .gauge-wrap{width:220px;flex-shrink:0;position:relative}
+  .gauge-wrap svg{width:100%;display:block}
+  .gauge-label{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);text-align:center}
+  .gauge-label .num{font-family:var(--mono);font-size:2.8rem;font-weight:700;line-height:1;color:var(--amber)}
+  .gauge-label .sub{font-size:.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.12em;margin-top:2px}
+  .score-desc{flex:1}
+  .score-desc h2{font-size:1.1rem;font-weight:600;margin-bottom:6px;color:var(--amber)}
+  .score-desc p{font-size:.88rem;color:var(--text-dim);line-height:1.6;max-width:540px}
+
+  .kpi-strip{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:36px}
+  .kpi{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;position:relative;overflow:hidden}
+  .kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+  .kpi.g::before{background:var(--green)}.kpi.r::before{background:var(--red)}.kpi.a::before{background:var(--amber)}.kpi.b::before{background:var(--blue)}
+  .kpi .label{font-size:.65rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);margin-bottom:6px}
+  .kpi .val{font-family:var(--mono);font-size:1.05rem;font-weight:600}
+  .kpi .sub{font-family:var(--mono);font-size:.7rem;color:var(--text-muted);margin-top:2px}
+
+  .chart-section{margin-bottom:36px}
+  .chart-section h3{font-size:.75rem;text-transform:uppercase;letter-spacing:.12em;color:var(--text-muted);margin-bottom:12px}
+  .chart-box{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px 24px 16px;position:relative;overflow:hidden}
+  .chart-box svg{width:100%;display:block}
+
+  .card-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:36px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px 20px;position:relative;overflow:hidden}
+  .card::before{content:'';position:absolute;top:0;left:0;width:3px;height:100%;border-radius:0 3px 3px 0}
+  .card.green::before{background:var(--green)}.card.red::before{background:var(--red)}.card.amber::before{background:var(--amber)}
+  .card .card-title{font-size:.7rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);margin-bottom:10px;display:flex;align-items:center;gap:8px}
+  .card .card-title .dot-ind{width:6px;height:6px;border-radius:50%}
+  .card.green .dot-ind{background:var(--green)}.card.red .dot-ind{background:var(--red)}.card.amber .dot-ind{background:var(--amber)}
+  .card ul{list-style:none;padding:0}
+  .card li{font-size:.82rem;color:var(--text-dim);padding:4px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:10px}
+  .card li:last-child{border:none}
+  .card li .v{font-family:var(--mono);font-weight:500;font-size:.78rem;white-space:nowrap}
+  .card li .v.g{color:var(--green)}.card li .v.r{color:var(--red)}.card li .v.a{color:var(--amber)}
+
+  .breakdown{margin-bottom:16px}
+  .breakdown h3{font-size:.75rem;text-transform:uppercase;letter-spacing:.12em;color:var(--text-muted);margin-bottom:14px}
+  .breakdown .w-note{font-family:var(--mono);font-size:.65rem;color:var(--text-muted);margin-top:-8px;margin-bottom:14px}
+  .bar-row{display:flex;align-items:center;gap:14px;margin-bottom:10px}
+  .bar-row .bar-label{font-size:.8rem;color:var(--text-dim);width:150px;flex-shrink:0}
+  .bar-row .bar-track{flex:1;height:10px;background:var(--surface2);border-radius:5px;overflow:hidden;position:relative}
+  .bar-row .bar-fill{height:100%;border-radius:5px;position:relative}
+  .bar-row .bar-fill::after{content:'';position:absolute;top:0;right:0;bottom:0;width:40%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.1))}
+  .bar-row .bar-num{font-family:var(--mono);font-size:.8rem;font-weight:600;width:72px;text-align:right;flex-shrink:0;color:var(--text-dim)}
+
+  .qtable{width:100%;border-collapse:collapse;margin-bottom:36px;font-size:.82rem}
+  .qtable th{font-size:.65rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);font-weight:500;padding:10px 12px;text-align:right;border-bottom:1px solid var(--border-light)}
+  .qtable th:first-child{text-align:left}
+  .qtable td{font-family:var(--mono);font-weight:400;padding:10px 12px;text-align:right;border-bottom:1px solid var(--border);color:var(--text-dim)}
+  .qtable td:first-child{font-family:var(--sans);color:var(--text);text-align:left;font-weight:500}
+  .qtable tr:hover td{background:var(--surface)}
+  .qtable .highlight td{background:var(--surface2);color:var(--text)}
+
+  .dual{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:36px}
+  .dual-col{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px 22px}
+  .dual-col h4{font-size:.7rem;text-transform:uppercase;letter-spacing:.12em;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+  .dual-col h4 .ic{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.65rem}
+  .dual-col.catalysts h4{color:var(--green)}.dual-col.catalysts h4 .ic{background:var(--green-dim);color:var(--green)}
+  .dual-col.risks h4{color:var(--red)}.dual-col.risks h4 .ic{background:var(--red-dim);color:var(--red)}
+  .dual-col li{font-size:.82rem;color:var(--text-dim);padding:6px 0;border-bottom:1px solid var(--border);line-height:1.5}
+  .dual-col li:last-child{border:none}
+  .dual-col ul{list-style:none;padding:0}
+
+  .earnings-box{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px 24px;margin-bottom:36px}
+  .earnings-box h4{font-size:.7rem;text-transform:uppercase;letter-spacing:.12em;color:var(--text-muted);margin-bottom:10px}
+  .earnings-box p{font-size:.88rem;color:var(--text-dim);line-height:1.65}
+  .earnings-box .highlight-date{font-family:var(--mono);color:var(--cyan);font-weight:500}
+
+  .bottom-line{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px 28px;position:relative;overflow:hidden}
+  .bottom-line::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--red),var(--amber),var(--green))}
+  .bottom-line h3{font-size:.95rem;font-weight:600;margin-bottom:8px;color:var(--text)}
+  .bottom-line p{font-size:.88rem;color:var(--text-dim);line-height:1.65;margin-bottom:16px}
+  .rating-bar{display:flex;align-items:center;gap:16px;margin-top:14px}
+  .rating-bar .segments{display:flex;gap:3px;flex:1}
+  .rating-bar .seg{height:8px;flex:1;border-radius:4px;background:var(--surface2)}
+  .rating-bar .seg.active-r{background:var(--red)}.rating-bar .seg.active-a{background:var(--amber)}.rating-bar .seg.active-g{background:var(--green)}
+  .rating-bar .verdict{font-family:var(--mono);font-size:.95rem;font-weight:700;color:var(--amber);white-space:nowrap}
+  .rating-labels{display:flex;justify-content:space-between;margin-top:6px;font-size:.6rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted)}
+
+  .copy-btn{position:fixed;bottom:24px;right:24px;background:var(--surface2);border:1px solid var(--border-light);color:var(--text-dim);font-family:var(--mono);font-size:.75rem;padding:10px 18px;border-radius:8px;cursor:pointer;z-index:100;transition:all .2s}
+  .copy-btn:hover{background:var(--cyan);color:#08090d;border-color:var(--cyan)}
+
+  .section-title{font-size:.75rem;text-transform:uppercase;letter-spacing:.12em;color:var(--text-muted);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+
+  .report-footer{text-align:center;padding:20px 0 0;font-size:.65rem;color:var(--text-muted);border-top:1px solid var(--border);margin-top:32px}
+
+  @media(max-width:800px){
+    .kpi-strip{grid-template-columns:repeat(3,1fr)}
+    .card-grid{grid-template-columns:1fr}
+    .dual{grid-template-columns:1fr}
+    .stock-bar{flex-wrap:wrap}
+    .gauge-row{flex-direction:column;align-items:flex-start}
+  }
+</style>
+</head>
+<body>
+
+<div class="page" id="page1">
+
+  <div class="ts-only" id="analysis-ts">2026-04-14 21:21:11 CEST</div>
+
+  <div class="stock-bar">
+    <div class="dot"></div>
+    <div>
+      <div class="ticker">MNTN</div>
+      <div class="company">MNTN, Inc. &middot; NYSE</div>
+    </div>
+    <div class="meta">
+      <span>Mkt Cap <b style="color:var(--text)">$663.4M</b></span>
+      <span>52w <b style="color:var(--text)">$7.71 – $32.49</b></span>
+      <span>Avg Vol <b style="color:var(--text)">625.2K</b></span>
+    </div>
+    <div class="price-block">
+      <div class="price">$8.97</div>
+      <div class="change pos">▲ +2.5% vs prior close</div>
+    </div>
+  </div>
+
+  <div class="gauge-row">
+    <div class="gauge-wrap">
+      <svg viewBox="0 0 200 120" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <defs>
+          <linearGradient id="gaugeBg" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#1a1e2a"/>
+            <stop offset="100%" stop-color="#1a1e2a"/>
+          </linearGradient>
+          <linearGradient id="gaugeGrad" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#00e676"/>
+            <stop offset="40%" stop-color="#ffab40"/>
+            <stop offset="100%" stop-color="#ff5252"/>
+          </linearGradient>
+        </defs>
+        <path d="M 20 105 A 80 80 0 0 1 180 105" fill="none" stroke="url(#gaugeBg)" stroke-width="12" stroke-linecap="round"/>
+        <path d="M 20 105 A 80 80 0 0 1 180 105" fill="none" stroke="url(#gaugeGrad)" stroke-width="12" stroke-linecap="round" stroke-dasharray="251.33" stroke-dashoffset="103.05" opacity=".92"/>
+        <text x="14" y="115" font-family="JetBrains Mono" font-size="8" fill="#565e74">0</text>
+        <text x="93" y="20" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">50</text>
+        <text x="178" y="115" font-family="JetBrains Mono" font-size="8" fill="#565e74">100</text>
+        <circle cx="121" cy="29" r="4" fill="#ffab40" opacity=".95"/>
+      </svg>
+      <div class="gauge-label">
+        <div class="num">59</div>
+        <div class="sub">Risk Score</div>
+      </div>
+    </div>
+    <div class="score-desc">
+      <h2>Elevated Risk — Growth vs. Multiple Compression</h2>
+      <p>Fundamentals inflected positively in late 2025 (record Q4 revenue, sharply higher adjusted EBITDA, raised 2026 guide), yet the equity sits ~72% below its 52-week high with no meaningful P/E anchor and persistent small-cap ad-tech sentiment swings. The setup is <strong>asymmetric</strong>: execution on $345–355M FY26 revenue and ~35%+ EBITDA margins could re-rate shares toward consensus targets, while any guide cut or macro ad pullback would punish a still-volatile float.</p>
+    </div>
+  </div>
+
+  <div class="kpi-strip">
+    <div class="kpi r">
+      <div class="label">Drawdown (52w)</div>
+      <div class="val" style="color:var(--red)">−72.4%</div>
+      <div class="sub">from $32.49 high</div>
+    </div>
+    <div class="kpi g">
+      <div class="label">FY25 Revenue</div>
+      <div class="val" style="color:var(--green)">$290.1M</div>
+      <div class="sub">+29% YoY (GAAP)</div>
+    </div>
+    <div class="kpi g">
+      <div class="label">FY25 Adj. EBITDA</div>
+      <div class="val" style="color:var(--green)">$68.0M</div>
+      <div class="sub">23% of revenue</div>
+    </div>
+    <div class="kpi a">
+      <div class="label">Q4 Gross Margin</div>
+      <div class="val" style="color:var(--green)">82%</div>
+      <div class="sub">+530 bps YoY</div>
+    </div>
+    <div class="kpi b">
+      <div class="label">Active PTV Customers</div>
+      <div class="val" style="color:var(--cyan)">3,632</div>
+      <div class="sub">+63% YoY (Q4)</div>
+    </div>
+    <div class="kpi a">
+      <div class="label">Next Earnings</div>
+      <div class="val" style="color:var(--amber)">~May 5</div>
+      <div class="sub">Q1 2026 (est.)</div>
+    </div>
+  </div>
+
+  <div class="chart-section">
+    <h3>12-Month Price Action &middot; MNTN (approx. monthly)</h3>
+    <div class="chart-box">
+      <svg viewBox="0 0 1000 300" xmlns="http://www.w3.org/2000/svg" style="overflow:visible" aria-label="12 month price chart">
+        <defs>
+          <linearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#18ffff" stop-opacity=".14"/>
+            <stop offset="100%" stop-color="#18ffff" stop-opacity="0"/>
+          </linearGradient>
+          <linearGradient id="lineGrad" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#448aff"/>
+            <stop offset="45%" stop-color="#00e676"/>
+            <stop offset="100%" stop-color="#ff5252"/>
+          </linearGradient>
+        </defs>
+        <line x1="60" y1="20" x2="60" y2="260" stroke="#1e2330" stroke-width=".5"/>
+        <line x1="60" y1="260" x2="980" y2="260" stroke="#1e2330" stroke-width=".5"/>
+        <line x1="60" y1="70" x2="980" y2="70" stroke="#1e2330" stroke-width=".5" stroke-dasharray="4"/>
+        <line x1="60" y1="120" x2="980" y2="120" stroke="#1e2330" stroke-width=".5" stroke-dasharray="4"/>
+        <line x1="60" y1="170" x2="980" y2="170" stroke="#1e2330" stroke-width=".5" stroke-dasharray="4"/>
+        <line x1="60" y1="220" x2="980" y2="220" stroke="#1e2330" stroke-width=".5" stroke-dasharray="4"/>
+        <text x="50" y="24" font-family="JetBrains Mono" font-size="9" fill="#565e74" text-anchor="end">$34</text>
+        <text x="50" y="74" font-family="JetBrains Mono" font-size="9" fill="#565e74" text-anchor="end">$26</text>
+        <text x="50" y="124" font-family="JetBrains Mono" font-size="9" fill="#565e74" text-anchor="end">$18</text>
+        <text x="50" y="174" font-family="JetBrains Mono" font-size="9" fill="#565e74" text-anchor="end">$14</text>
+        <text x="50" y="224" font-family="JetBrains Mono" font-size="9" fill="#565e74" text-anchor="end">$10</text>
+        <text x="50" y="264" font-family="JetBrains Mono" font-size="9" fill="#565e74" text-anchor="end">$8</text>
+        <text x="80" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Apr</text>
+        <text x="155" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">May</text>
+        <text x="230" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Jun</text>
+        <text x="305" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Jul</text>
+        <text x="380" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Aug</text>
+        <text x="455" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Sep</text>
+        <text x="530" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Oct</text>
+        <text x="605" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Nov</text>
+        <text x="680" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Dec</text>
+        <text x="755" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Jan</text>
+        <text x="830" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Feb</text>
+        <text x="905" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Mar</text>
+        <text x="960" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Apr</text>
+        <path d="M 80,175 L 155,150 230,95 305,55 380,88 455,105 530,118 605,128 680,38 755,72 830,195 905,218 960,232 L 960,260 80,260 Z" fill="url(#chartFill)"/>
+        <polyline points="80,175 155,150 230,95 305,55 380,88 455,105 530,118 605,128 680,38 755,72 830,195 905,218 960,232" fill="none" stroke="url(#lineGrad)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+        <circle cx="680" cy="38" r="4" fill="#00e676" stroke="#08090d" stroke-width="2"/>
+        <line x1="680" y1="38" x2="680" y2="62" stroke="#00e676" stroke-width=".8" stroke-dasharray="3"/>
+        <rect x="615" y="12" width="130" height="18" rx="4" fill="#0a2618" stroke="#00e676" stroke-width=".5"/>
+        <text x="680" y="24" font-family="JetBrains Mono" font-size="8" fill="#00e676" text-anchor="middle">52w High $32.49</text>
+
+        <circle cx="830" cy="195" r="4" fill="#448aff" stroke="#08090d" stroke-width="2"/>
+        <line x1="830" y1="195" x2="848" y2="168" stroke="#448aff" stroke-width=".8" stroke-dasharray="3"/>
+        <rect x="770" y="138" width="150" height="18" rx="4" fill="#141720" stroke="#448aff" stroke-width=".5"/>
+        <text x="845" y="150" font-family="JetBrains Mono" font-size="8" fill="#448aff" text-anchor="middle">Q4/FY25 Print — Feb 10</text>
+
+        <circle cx="960" cy="232" r="4" fill="#ff5252" stroke="#08090d" stroke-width="2"/>
+        <line x1="960" y1="232" x2="930" y2="248" stroke="#ff5252" stroke-width=".8" stroke-dasharray="3"/>
+        <rect x="860" y="248" width="118" height="18" rx="4" fill="#2a0e0e" stroke="#ff5252" stroke-width=".5"/>
+        <text x="919" y="260" font-family="JetBrains Mono" font-size="8" fill="#ff5252" text-anchor="middle">52w Low $7.71</text>
+      </svg>
+    </div>
+  </div>
+
+  <div class="section-title">Factor Cards — Valuation &middot; Financial Health &middot; Growth</div>
+  <div class="card-grid">
+    <div class="card amber">
+      <div class="card-title"><span class="dot-ind"></span>Valuation — Multiples</div>
+      <ul>
+        <li>EV / Rev (approx.) <span class="v a">~2.3×</span></li>
+        <li>P/E (GAAP TTM) <span class="v a">N/A / noisy</span></li>
+        <li>vs. Street PT (~$22.5) <span class="v g">Deep upside</span></li>
+      </ul>
+    </div>
+    <div class="card red">
+      <div class="card-title"><span class="dot-ind"></span>Valuation — Price Action</div>
+      <ul>
+        <li>Below 200-DMA (~$12.3) <span class="v r">Trend miss</span></li>
+        <li>Below 50-DMA (~$9.4) <span class="v r">Near-term miss</span></li>
+        <li>Realized vol / drawdown <span class="v r">Extreme</span></li>
+      </ul>
+    </div>
+    <div class="card green">
+      <div class="card-title"><span class="dot-ind"></span>Financial Health — Profitability</div>
+      <ul>
+        <li>Q4 Adj. EBITDA margin <span class="v g">32%</span></li>
+        <li>FY25 Adj. EBITDA <span class="v g">$68.0M</span></li>
+        <li>Gross margin trajectory <span class="v g">Expanding</span></li>
+      </ul>
+    </div>
+    <div class="card amber">
+      <div class="card-title"><span class="dot-ind"></span>Financial Health — Balance Sheet</div>
+      <ul>
+        <li>Cash &amp; ST investments <span class="v g">~$72.6M</span></li>
+        <li>GAAP net (FY25) <span class="v a">−$6.4M*</span></li>
+        <li>FCF / reinvestment needs <span class="v a">Watch</span></li>
+      </ul>
+    </div>
+    <div class="card green">
+      <div class="card-title"><span class="dot-ind"></span>Growth — Top Line</div>
+      <ul>
+        <li>Q4 revenue (GAAP) <span class="v g">$87.1M</span></li>
+        <li>FY26 revenue guide <span class="v g">$345–355M</span></li>
+        <li>Q3 rev (ex-ME) YoY <span class="v g">+31%</span></li>
+      </ul>
+    </div>
+    <div class="card amber">
+      <div class="card-title"><span class="dot-ind"></span>Growth — Quality / Mix</div>
+      <ul>
+        <li>Customer adds (Q4 YoY) <span class="v g">+63%</span></li>
+        <li>Long-term EBITDA target <span class="v g">35–40%</span></li>
+        <li>Macro SMB ad sensitivity <span class="v a">Cyclical</span></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="breakdown">
+    <h3>Risk Score Breakdown</h3>
+    <p class="w-note">Weights: Valuation 35 &middot; Financial Health 35 &middot; Growth 30 — higher segment score = higher risk contribution</p>
+    <div class="bar-row">
+      <div class="bar-label">Valuation (max 35)</div>
+      <div class="bar-track"><div class="bar-fill" style="width:65.7%;background:linear-gradient(90deg,#ffab40,#ff5252)"></div></div>
+      <div class="bar-num">23 / 35</div>
+    </div>
+    <div class="bar-row">
+      <div class="bar-label">Financial Health (max 35)</div>
+      <div class="bar-track"><div class="bar-fill" style="width:48.6%;background:linear-gradient(90deg,#00e676,#ffab40)"></div></div>
+      <div class="bar-num">17 / 35</div>
+    </div>
+    <div class="bar-row">
+      <div class="bar-label">Growth (max 30)</div>
+      <div class="bar-track"><div class="bar-fill" style="width:63.3%;background:linear-gradient(90deg,#ffab40,#ff5252)"></div></div>
+      <div class="bar-num">19 / 30</div>
+    </div>
+  </div>
+</div>
+
+<div class="page" id="page2">
+
+  <div class="ts-only">2026-04-14 21:21:11 CEST</div>
+
+  <div class="section-title">Quarterly Trend — Revenue &amp; Profitability</div>
+  <table class="qtable">
+    <thead>
+      <tr>
+        <th>Metric</th>
+        <th>Q1&rsquo;25</th>
+        <th>Q2&rsquo;25</th>
+        <th>Q3&rsquo;25</th>
+        <th>Q4&rsquo;25</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Revenue ($M, GAAP)</td>
+        <td>59.1</td>
+        <td>68.5</td>
+        <td>70.0</td>
+        <td style="color:var(--green)">87.1</td>
+      </tr>
+      <tr>
+        <td>YoY Rev Growth (co. adj.)</td>
+        <td style="color:var(--text-muted)">—</td>
+        <td style="color:var(--text-muted)">—</td>
+        <td style="color:var(--green)">+31%</td>
+        <td style="color:var(--green)">+25%</td>
+      </tr>
+      <tr>
+        <td>Adj. EBITDA ($M)</td>
+        <td style="color:var(--green)">9.4</td>
+        <td style="color:var(--green)">14.5</td>
+        <td style="color:var(--green)">16.0</td>
+        <td style="color:var(--green)">28.1</td>
+      </tr>
+      <tr class="highlight">
+        <td>Adj. EBITDA % of Rev</td>
+        <td style="color:var(--amber)">16%</td>
+        <td style="color:var(--amber)">21%</td>
+        <td style="color:var(--amber)">23%</td>
+        <td style="color:var(--green)">32%</td>
+      </tr>
+      <tr>
+        <td>Gross Margin</td>
+        <td style="color:var(--text-muted)">—</td>
+        <td style="color:var(--text-muted)">—</td>
+        <td style="color:var(--green)">79%</td>
+        <td style="color:var(--green)">82%</td>
+      </tr>
+    </tbody>
+  </table>
+  <p style="font-family:var(--mono);font-size:.65rem;color:var(--text-muted);margin-top:-24px;margin-bottom:28px">Q1–Q3 revenue shown ex-Maximum Effort for YoY comparability (divested Apr 2025). Q4 headline uses GAAP print. Q1&rsquo;25 Adj. EBITDA ($9.4M) is the residual of FY25 total $68.0M minus Q2–Q4 company-reported adjusted EBITDA. Q3 gross margin 79% per Q3&rsquo;25 release.</p>
+
+  <div class="earnings-box">
+    <h4>Latest Earnings &amp; Delivery / Guidance Update</h4>
+    <p>
+      On <span class="highlight-date">February 10, 2026</span>, MNTN reported <strong>record Q4 and full-year 2025</strong> results: Q4 revenue <strong>$87.1M</strong> (~+25% YoY GAAP), gross margin <strong>82%</strong>, and adjusted EBITDA <strong>$28.1M</strong> (32% of revenue). FY25 revenue reached <strong>$290.1M</strong> (+29% YoY GAAP) with adjusted EBITDA of <strong>$68.0M</strong> (23% of revenue). Management guided <strong>FY26 revenue of $345–355M</strong> and <strong>adjusted EBITDA of $94.6–99.6M</strong>, implying continued operating leverage. Q1&rsquo;26 revenue guidance was set at <strong>$71.3–73.3M</strong> (midpoint ~+22% YoY vs. adjusted Q1&rsquo;25). There is <em>no separate vehicle delivery metric</em>; key demand proxy is <strong>Performance TV customer growth</strong> (3,632; +63% YoY). The next quarterly report is expected the first week of May 2026 (vendor calendars cluster around <span class="highlight-date">May 4–11, 2026</span>).
+    </p>
+  </div>
+
+  <div class="dual">
+    <div class="dual-col catalysts">
+      <h4><span class="ic">▲</span> Catalysts</h4>
+      <ul>
+        <li><strong>Operating leverage</strong> — FY26 EBITDA guide ~$95–100M embeds ~350–400 bps margin expansion vs. FY25.</li>
+        <li><strong>Platform scale</strong> — PTV customer count +63% YoY evidences durable land-and-expand motion.</li>
+        <li><strong>Creative / measurement stack</strong> — Creative-as-a-Subscription and closed-loop attribution deepen net revenue retention.</li>
+        <li><strong>Multiple re-rating</strong> — shares trade far below sell-side PTs if margins stabilize above 30%.</li>
+        <li><strong>M&amp;A optionality</strong> — profitable SaaS + clean narrative could attract strategic interest in ad-automation.</li>
+      </ul>
+    </div>
+    <div class="dual-col risks">
+      <h4><span class="ic">▼</span> Risks</h4>
+      <ul>
+        <li><strong>Macro ad cyclicality</strong> — SMB performance marketing budgets are first to tighten in a slowdown.</li>
+        <li><strong>Competitive intensity</strong> — The Trade Desk, Meta/Google duopoly, and retail media networks compress pricing power.</li>
+        <li><strong>Volatility &amp; liquidity</strong> — ~72% drawdown from 52w high; elevated sentiment beta on small revenue misses.</li>
+        <li><strong>GAAP vs. adjusted gap</strong> — FY25 still carried net loss and one-time IPO costs — adjusted metrics need to convert to durable GAAP profits.</li>
+        <li><strong>Guidance execution</strong> — FY26 top-line acceleration is already priced as base case; misses would de-rate aggressively.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="bottom-line">
+    <h3>Bottom Line</h3>
+    <p>
+      MNTN is a <strong>high-conviction growth / high-volatility</strong> name: the 2025–2026 fundamental story improved materially (revenue scale, gross margin >80%, EBITDA inflection, explicit FY26 targets), but the chart remains wrecked relative to the 52-week high, reflecting prior multiple compression and small-cap risk appetite. The bull path is straightforward — hit $350M+ revenue with ~28–32% EBITDA margins and sustain customer adds — which could close a large chunk of the ~$22 consensus PT gap. The bear path is equally clear: any ad recession, competitive share loss, or guide cut given thin GAAP profitability would extend the drawdown. Position sizing should reflect <em>equity volatility</em>, not just operating quality.
+    </p>
+    <div class="rating-bar">
+      <div class="segments">
+        <div class="seg"></div>
+        <div class="seg"></div>
+        <div class="seg active-a"></div>
+        <div class="seg active-a"></div>
+        <div class="seg active-a"></div>
+        <div class="seg active-a"></div>
+        <div class="seg active-a"></div>
+        <div class="seg"></div>
+        <div class="seg"></div>
+        <div class="seg"></div>
+      </div>
+      <div class="verdict">HOLD / SPECULATIVE</div>
+    </div>
+    <div class="rating-labels">
+      <span>Strong Buy</span>
+      <span>Buy</span>
+      <span>Hold</span>
+      <span>Sell</span>
+      <span>Strong Sell</span>
+    </div>
+  </div>
+
+  <div class="report-footer">
+    Not investment advice &middot; Data: Google Finance (intraday quote Apr 14, 2026), MNTN press releases (Q3/Q4 2025, FY25), BusinessWire/Nasdaq/Yahoo Finance summaries &middot; Chart is illustrative monthly interpolation
+  </div>
+</div>
+
+<button type="button" class="copy-btn" onclick="copyReport()">Copy to Clipboard</button>
+
+<script>
+function copyReport(){
+  const ts = document.getElementById('analysis-ts').textContent.trim();
+  const text = [];
+  text.push(ts);
+  text.push('MNTN — MNTN, Inc. (NYSE)');
+  text.push('═'.repeat(52));
+  text.push('Price: $8.97 | Day: $8.76–9.21 | Prev close: $8.75');
+  text.push('Mkt cap: $663.4M | 52w: $7.71–32.49 | Avg vol: 625.2K');
+  text.push('');
+  text.push('RISK SCORE: 59/100 — Elevated (Growth vs. Compression)');
+  text.push('  Valuation:      23 / 35');
+  text.push('  Financial Health: 17 / 35');
+  text.push('  Growth:         19 / 30');
+  text.push('');
+  text.push('KPI HIGHLIGHTS');
+  text.push('  FY25 revenue $290.1M (+29% YoY GAAP)');
+  text.push('  FY25 Adj EBITDA $68.0M (23% of revenue)');
+  text.push('  Q4 revenue $87.1M; Adj EBITDA $28.1M (32% margin); GM 82%');
+  text.push('  FY26 guide: revenue $345–355M; Adj EBITDA $94.6–99.6M');
+  text.push('  Active PTV customers Q4: 3,632 (+63% YoY)');
+  text.push('');
+  text.push('VERDICT: HOLD / SPECULATIVE — align size with volatility');
+  text.push('Next earnings: early May 2026 (Q1 2026 est.)');
+  text.push('');
+  text.push('Not investment advice.');
+  navigator.clipboard.writeText(text.join('\n')).then(()=>{
+    const btn = document.querySelector('.copy-btn');
+    btn.textContent = 'Copied';
+    btn.style.background = '#00e676';
+    btn.style.color = '#08090d';
+    btn.style.borderColor = '#00e676';
+    setTimeout(()=>{
+      btn.textContent = 'Copy to Clipboard';
+      btn.style.background = '';
+      btn.style.color = '';
+      btn.style.borderColor = '';
+    }, 2000);
+  }).catch((e)=>{ console.error(e); });
+}
+</script>
+</body>
+</html>

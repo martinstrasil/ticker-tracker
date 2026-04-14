@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>T — AT&amp;T Risk Score Report</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#08090d;--surface:#0e1017;--surface2:#141720;--surface3:#1a1e2a;
+    --border:#1e2330;--border-light:#2a3040;
+    --text:#e8eaf0;--text-dim:#8890a4;--text-muted:#565e74;
+    --green:#00e676;--green-dim:#00e67620;--green-bg:#0a2618;
+    --red:#ff5252;--red-dim:#ff525220;--red-bg:#2a0e0e;
+    --amber:#ffab40;--amber-dim:#ffab4020;--amber-bg:#2a1e0a;
+    --blue:#448aff;--blue-dim:#448aff20;
+    --cyan:#18ffff;
+    --mono:'JetBrains Mono',monospace;
+    --sans:'DM Sans',sans-serif;
+    --page-w:1080px;
+  }
+  html{font-size:14px}
+  body{background:var(--bg);color:var(--text);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
+
+  .page{max-width:var(--page-w);margin:0 auto;padding:48px 40px;min-height:100vh;position:relative}
+  .page+.page{border-top:1px solid var(--border)}
+  .page::before{content:'';position:absolute;top:0;left:0;right:0;height:260px;background:linear-gradient(180deg,#448aff08 0%,transparent 100%);pointer-events:none}
+
+  @media print{.page{page-break-before:always;padding:24px}}
+
+  .stock-bar{display:flex;align-items:center;gap:20px;padding:16px 24px;background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:32px;position:relative;overflow:hidden}
+  .stock-bar::after{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--blue),transparent)}
+  .stock-bar .ticker{font-family:var(--mono);font-size:1.7rem;font-weight:700;letter-spacing:-.02em;color:var(--text)}
+  .stock-bar .company{font-size:.95rem;color:var(--text-dim);margin-left:-8px}
+  .stock-bar .price-block{margin-left:auto;text-align:right}
+  .stock-bar .price{font-family:var(--mono);font-size:1.6rem;font-weight:600}
+  .stock-bar .change{font-family:var(--mono);font-size:.85rem;padding:3px 10px;border-radius:6px;display:inline-block;margin-top:2px}
+  .stock-bar .change.neg{color:var(--red);background:var(--red-dim)}
+  .stock-bar .change.pos{color:var(--green);background:var(--green-dim)}
+  .stock-bar .meta{font-family:var(--mono);font-size:.75rem;color:var(--text-muted);display:flex;flex-direction:column;gap:2px;min-width:160px}
+  .stock-bar .dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);animation:pulse 2s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+  .gauge-row{display:flex;align-items:center;gap:40px;margin-bottom:36px}
+  .gauge-wrap{width:220px;flex-shrink:0;position:relative}
+  .gauge-wrap svg{width:100%;display:block}
+  .gauge-label{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);text-align:center}
+  .gauge-label .num{font-family:var(--mono);font-size:2.8rem;font-weight:700;line-height:1;color:var(--amber)}
+  .gauge-label .sub{font-size:.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.12em;margin-top:2px}
+  .score-desc{flex:1}
+  .score-desc h2{font-size:1.1rem;font-weight:600;margin-bottom:6px;color:var(--amber)}
+  .score-desc p{font-size:.88rem;color:var(--text-dim);line-height:1.6;max-width:520px}
+
+  .kpi-strip{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:36px}
+  .kpi{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;position:relative;overflow:hidden}
+  .kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+  .kpi.g::before{background:var(--green)}.kpi.r::before{background:var(--red)}.kpi.a::before{background:var(--amber)}.kpi.b::before{background:var(--blue)}
+  .kpi .label{font-size:.65rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);margin-bottom:6px}
+  .kpi .val{font-family:var(--mono);font-size:1.15rem;font-weight:600}
+  .kpi .sub{font-family:var(--mono);font-size:.7rem;color:var(--text-muted);margin-top:2px}
+
+  .chart-section{margin-bottom:36px}
+  .chart-section h3{font-size:.75rem;text-transform:uppercase;letter-spacing:.12em;color:var(--text-muted);margin-bottom:12px}
+  .chart-box{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px 24px 16px;position:relative;overflow:hidden}
+  .chart-box svg{width:100%;display:block}
+
+  .card-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:36px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px 20px;position:relative;overflow:hidden}
+  .card::before{content:'';position:absolute;top:0;left:0;width:3px;height:100%;border-radius:0 3px 3px 0}
+  .card.green::before{background:var(--green)}.card.red::before{background:var(--red)}.card.amber::before{background:var(--amber)}
+  .card .card-title{font-size:.7rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);margin-bottom:10px;display:flex;align-items:center;gap:8px}
+  .card .card-title .dot-ind{width:6px;height:6px;border-radius:50%}
+  .card.green .dot-ind{background:var(--green)}.card.red .dot-ind{background:var(--red)}.card.amber .dot-ind{background:var(--amber)}
+  .card ul{list-style:none;padding:0}
+  .card li{font-size:.82rem;color:var(--text-dim);padding:4px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+  .card li:last-child{border:none}
+  .card li .v{font-family:var(--mono);font-weight:500;font-size:.8rem}
+  .card li .v.g{color:var(--green)}.card li .v.r{color:var(--red)}.card li .v.a{color:var(--amber)}
+
+  .breakdown{margin-bottom:16px}
+  .breakdown h3{font-size:.75rem;text-transform:uppercase;letter-spacing:.12em;color:var(--text-muted);margin-bottom:14px}
+  .bar-row{display:flex;align-items:center;gap:14px;margin-bottom:10px}
+  .bar-row .bar-label{font-size:.8rem;color:var(--text-dim);width:140px;flex-shrink:0}
+  .bar-row .bar-track{flex:1;height:10px;background:var(--surface2);border-radius:5px;overflow:hidden;position:relative}
+  .bar-row .bar-fill{height:100%;border-radius:5px;position:relative}
+  .bar-row .bar-fill::after{content:'';position:absolute;top:0;right:0;bottom:0;width:40%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.12))}
+  .bar-row .bar-num{font-family:var(--mono);font-size:.8rem;font-weight:600;width:60px;text-align:right;flex-shrink:0}
+
+  .qtable{width:100%;border-collapse:collapse;margin-bottom:36px;font-size:.82rem}
+  .qtable th{font-size:.65rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);font-weight:500;padding:10px 12px;text-align:right;border-bottom:1px solid var(--border-light)}
+  .qtable th:first-child{text-align:left}
+  .qtable td{font-family:var(--mono);font-weight:400;padding:10px 12px;text-align:right;border-bottom:1px solid var(--border);color:var(--text-dim)}
+  .qtable td:first-child{font-family:var(--sans);color:var(--text);text-align:left;font-weight:500}
+  .qtable tr:hover td{background:var(--surface)}
+  .qtable .highlight td{background:var(--surface2);color:var(--text)}
+
+  .dual{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:36px}
+  .dual-col{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px 22px}
+  .dual-col h4{font-size:.7rem;text-transform:uppercase;letter-spacing:.12em;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+  .dual-col h4 .ic{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.65rem}
+  .dual-col.catalysts h4{color:var(--green)}.dual-col.catalysts h4 .ic{background:var(--green-dim);color:var(--green)}
+  .dual-col.risks h4{color:var(--red)}.dual-col.risks h4 .ic{background:var(--red-dim);color:var(--red)}
+  .dual-col li{font-size:.82rem;color:var(--text-dim);padding:6px 0;border-bottom:1px solid var(--border);line-height:1.5}
+  .dual-col li:last-child{border:none}
+  .dual-col ul{list-style:none;padding:0}
+
+  .earnings-box{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px 24px;margin-bottom:36px}
+  .earnings-box h4{font-size:.7rem;text-transform:uppercase;letter-spacing:.12em;color:var(--text-muted);margin-bottom:10px}
+  .earnings-box p{font-size:.88rem;color:var(--text-dim);line-height:1.65}
+  .earnings-box .highlight-date{font-family:var(--mono);color:var(--cyan);font-weight:500}
+
+  .bottom-line{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px 28px;position:relative;overflow:hidden}
+  .bottom-line::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--red),var(--amber),var(--green))}
+  .bottom-line h3{font-size:.95rem;font-weight:600;margin-bottom:8px;color:var(--text)}
+  .bottom-line p{font-size:.88rem;color:var(--text-dim);line-height:1.65;margin-bottom:16px}
+  .rating-bar{display:flex;align-items:center;gap:16px;margin-top:14px}
+  .rating-bar .segments{display:flex;gap:3px;flex:1}
+  .rating-bar .seg{height:8px;flex:1;border-radius:4px;background:var(--surface2)}
+  .rating-bar .seg.active-r{background:var(--red)}.rating-bar .seg.active-a{background:var(--amber)}.rating-bar .seg.active-g{background:var(--green)}
+  .rating-bar .verdict{font-family:var(--mono);font-size:.95rem;font-weight:700;color:var(--amber);white-space:nowrap}
+  .rating-labels{display:flex;justify-content:space-between;margin-top:6px;font-size:.6rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted)}
+
+  .copy-btn{position:fixed;bottom:24px;right:24px;background:var(--surface2);border:1px solid var(--border-light);color:var(--text-dim);font-family:var(--mono);font-size:.75rem;padding:10px 18px;border-radius:8px;cursor:pointer;z-index:100;transition:all .2s}
+  .copy-btn:hover{background:var(--blue);color:#fff;border-color:var(--blue)}
+
+  .section-title{font-size:.75rem;text-transform:uppercase;letter-spacing:.12em;color:var(--text-muted);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+
+  .report-footer{text-align:center;padding:20px 0 0;font-size:.65rem;color:var(--text-muted);border-top:1px solid var(--border);margin-top:32px}
+
+  @media(max-width:800px){
+    .kpi-strip{grid-template-columns:repeat(3,1fr)}
+    .card-grid{grid-template-columns:1fr}
+    .dual{grid-template-columns:1fr}
+    .stock-bar{flex-wrap:wrap}
+    .gauge-row{flex-direction:column;align-items:flex-start}
+  }
+</style>
+</head>
+<body>
+
+<div class="page" id="page1">
+
+  <div style="display:flex;justify-content:flex-end;margin-bottom:14px">
+    <span style="font-family:var(--mono);font-size:.7rem;color:var(--text-muted);letter-spacing:.04em" id="analysis-ts">2026-04-14 21:23:02 CEST</span>
+  </div>
+
+  <div class="stock-bar">
+    <div class="dot"></div>
+    <div>
+      <div class="ticker">T</div>
+      <div class="company">AT&amp;T Inc. &middot; NYSE</div>
+    </div>
+    <div class="meta">
+      <span>Mkt Cap <b style="color:var(--text)">$198.2B</b></span>
+      <span>52w <b style="color:var(--text)">$22.95 – $29.79</b></span>
+      <span>Div yield <b style="color:var(--text)">~3.9%</b></span>
+    </div>
+    <div class="price-block">
+      <div class="price">$28.33</div>
+      <div class="change pos">▲ ~14% YTD</div>
+    </div>
+  </div>
+
+  <div class="gauge-row">
+    <div class="gauge-wrap">
+      <svg viewBox="0 0 200 120" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="gaugeBg" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#1a1e2a"/>
+            <stop offset="100%" stop-color="#1a1e2a"/>
+          </linearGradient>
+          <linearGradient id="gaugeGrad" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#00e676"/>
+            <stop offset="40%" stop-color="#ffab40"/>
+            <stop offset="100%" stop-color="#ff5252"/>
+          </linearGradient>
+        </defs>
+        <path d="M 20 105 A 80 80 0 0 1 180 105" fill="none" stroke="url(#gaugeBg)" stroke-width="12" stroke-linecap="round"/>
+        <path d="M 20 105 A 80 80 0 0 1 180 105" fill="none" stroke="url(#gaugeGrad)" stroke-width="12" stroke-linecap="round" stroke-dasharray="251" stroke-dashoffset="138" opacity=".9"/>
+        <text x="14" y="115" font-family="JetBrains Mono" font-size="8" fill="#565e74">0</text>
+        <text x="93" y="20" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">50</text>
+        <text x="178" y="115" font-family="JetBrains Mono" font-size="8" fill="#565e74">100</text>
+        <circle cx="78" cy="52" r="4" fill="#ffab40" opacity=".9"/>
+      </svg>
+      <div class="gauge-label">
+        <div class="num">45</div>
+        <div class="sub">Risk Score</div>
+      </div>
+    </div>
+    <div class="score-desc">
+      <h2>Moderate Risk — Income &amp; Leverage Balance</h2>
+      <p>AT&amp;T screens inexpensive on earnings (~9× trailing P/E) with a well-covered ~4% dividend and record FY25 free cash flow (~$16.6B), but net debt near ~$130B and legacy Business Wireline declines keep balance-sheet and structural risks in focus. Fiber and mobility growth are offsetting legacy erosion; 2026 is a transition year with new segment reporting and M&amp;A integration (Lumen fiber, EchoStar spectrum).</p>
+    </div>
+  </div>
+
+  <div class="kpi-strip">
+    <div class="kpi g">
+      <div class="label">P/E (TTM)</div>
+      <div class="val" style="color:var(--green)">~9.3×</div>
+      <div class="sub">Fwd ~8.5×</div>
+    </div>
+    <div class="kpi g">
+      <div class="label">FY25 Revenue</div>
+      <div class="val">$125.6B</div>
+      <div class="sub" style="color:var(--green)">+2.7% YoY</div>
+    </div>
+    <div class="kpi g">
+      <div class="label">FY25 Adj. EBITDA</div>
+      <div class="val">$46.4B</div>
+      <div class="sub" style="color:var(--green)">+3.1% YoY</div>
+    </div>
+    <div class="kpi g">
+      <div class="label">FY25 Free Cash Flow</div>
+      <div class="val">$16.6B</div>
+      <div class="sub" style="color:var(--green)">Guidance beat</div>
+    </div>
+    <div class="kpi a">
+      <div class="label">Net Debt</div>
+      <div class="val" style="color:var(--amber)">~$129B</div>
+      <div class="sub">Net debt / Adj. EBITDA ~2.8×</div>
+    </div>
+    <div class="kpi b">
+      <div class="label">Next Earnings</div>
+      <div class="val" style="color:var(--cyan)">Apr 22</div>
+      <div class="sub">Q1 FY26 (pre-open)</div>
+    </div>
+  </div>
+
+  <div class="chart-section">
+    <h3>12-Month Price Action &middot; T</h3>
+    <div class="chart-box">
+      <svg viewBox="0 0 1000 300" xmlns="http://www.w3.org/2000/svg" style="overflow:visible">
+        <defs>
+          <linearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#448aff" stop-opacity=".18"/>
+            <stop offset="100%" stop-color="#448aff" stop-opacity="0"/>
+          </linearGradient>
+          <linearGradient id="lineGrad" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#448aff"/>
+            <stop offset="55%" stop-color="#00e676"/>
+            <stop offset="100%" stop-color="#ffab40"/>
+          </linearGradient>
+        </defs>
+        <line x1="60" y1="20" x2="60" y2="260" stroke="#1e2330" stroke-width=".5"/>
+        <line x1="60" y1="260" x2="980" y2="260" stroke="#1e2330" stroke-width=".5"/>
+        <line x1="60" y1="80" x2="980" y2="80" stroke="#1e2330" stroke-width=".5" stroke-dasharray="4"/>
+        <line x1="60" y1="140" x2="980" y2="140" stroke="#1e2330" stroke-width=".5" stroke-dasharray="4"/>
+        <line x1="60" y1="200" x2="980" y2="200" stroke="#1e2330" stroke-width=".5" stroke-dasharray="4"/>
+        <text x="50" y="24" font-family="JetBrains Mono" font-size="9" fill="#565e74" text-anchor="end">$31</text>
+        <text x="50" y="84" font-family="JetBrains Mono" font-size="9" fill="#565e74" text-anchor="end">$28</text>
+        <text x="50" y="144" font-family="JetBrains Mono" font-size="9" fill="#565e74" text-anchor="end">$25</text>
+        <text x="50" y="204" font-family="JetBrains Mono" font-size="9" fill="#565e74" text-anchor="end">$23</text>
+        <text x="50" y="264" font-family="JetBrains Mono" font-size="9" fill="#565e74" text-anchor="end">$22</text>
+        <text x="80" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Apr</text>
+        <text x="155" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">May</text>
+        <text x="230" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Jun</text>
+        <text x="305" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Jul</text>
+        <text x="380" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Aug</text>
+        <text x="455" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Sep</text>
+        <text x="530" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Oct</text>
+        <text x="605" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Nov</text>
+        <text x="680" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Dec</text>
+        <text x="755" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Jan</text>
+        <text x="830" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Feb</text>
+        <text x="905" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Mar</text>
+        <text x="960" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Apr</text>
+        <!-- Approx. monthly closes Apr 25–Apr 26; illustrative vs. public ranges -->
+        <path d="M 80,85 L 155,118 230,132 305,100 380,95 455,88 530,102 605,92 680,72 755,78 830,90 905,48 960,81 L 960,260 80,260 Z" fill="url(#chartFill)"/>
+        <polyline points="80,85 155,118 230,132 305,100 380,95 455,88 530,102 605,92 680,72 755,78 830,90 905,48 960,81" fill="none" stroke="url(#lineGrad)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+        <circle cx="230" cy="132" r="3" fill="#448aff"/>
+        <circle cx="905" cy="48" r="4" fill="#00e676" stroke="#08090d" stroke-width="2"/>
+        <circle cx="960" cy="81" r="4" fill="#ffab40" stroke="#08090d" stroke-width="2"/>
+
+        <line x1="230" y1="132" x2="230" y2="150" stroke="#448aff" stroke-width=".8" stroke-dasharray="3"/>
+        <rect x="175" y="152" width="110" height="16" rx="4" fill="#141720" stroke="#448aff" stroke-width=".5"/>
+        <text x="230" y="163" font-family="JetBrains Mono" font-size="7.5" fill="#448aff" text-anchor="middle">52w Low $22.95</text>
+
+        <line x1="755" y1="78" x2="755" y2="58" stroke="#ffab40" stroke-width=".8" stroke-dasharray="3"/>
+        <rect x="695" y="42" width="120" height="16" rx="4" fill="#2a1e0a" stroke="#ffab40" stroke-width=".5"/>
+        <text x="755" y="53" font-family="JetBrains Mono" font-size="7.5" fill="#ffab40" text-anchor="middle">Q4 FY25 Print</text>
+
+        <line x1="905" y1="48" x2="905" y2="28" stroke="#00e676" stroke-width=".8" stroke-dasharray="3"/>
+        <rect x="848" y="10" width="114" height="16" rx="4" fill="#0a2618" stroke="#00e676" stroke-width=".5"/>
+        <text x="905" y="21" font-family="JetBrains Mono" font-size="7.5" fill="#00e676" text-anchor="middle">52w High $29.79</text>
+
+        <line x1="960" y1="81" x2="960" y2="100" stroke="#ffab40" stroke-width=".8" stroke-dasharray="3"/>
+        <rect x="900" y="102" width="120" height="16" rx="4" fill="#2a1e0a" stroke="#ffab40" stroke-width=".5"/>
+        <text x="960" y="113" font-family="JetBrains Mono" font-size="7.5" fill="#ffab40" text-anchor="middle">Pre Q1 Earnings</text>
+      </svg>
+    </div>
+  </div>
+
+  <div class="section-title">Fundamental Scorecard</div>
+  <div class="card-grid">
+    <div class="card green">
+      <div class="card-title"><span class="dot-ind"></span>Valuation</div>
+      <ul>
+        <li>Trailing P/E<span class="v g">~9.3×</span></li>
+        <li>Forward P/E<span class="v g">~8.5×</span></li>
+        <li>EV / Adj. EBITDA<span class="v g">~6.5×</span></li>
+        <li>Dividend Yield<span class="v g">~3.9%</span></li>
+        <li>Payout vs. FCF<span class="v a">~42%</span></li>
+      </ul>
+    </div>
+    <div class="card amber">
+      <div class="card-title"><span class="dot-ind"></span>Financial Health</div>
+      <ul>
+        <li>Net Debt<span class="v r">~$129B</span></li>
+        <li>Adj. EBITDA (FY25)<span class="v g">$46.4B</span></li>
+        <li>FCF (FY25)<span class="v g">$16.6B</span></li>
+        <li>Net Debt / EBITDA<span class="v a">~2.8×</span></li>
+        <li>Liquidity / Coverage<span class="v g">Adequate</span></li>
+      </ul>
+    </div>
+    <div class="card amber">
+      <div class="card-title"><span class="dot-ind"></span>Growth</div>
+      <ul>
+        <li>Consolidated Rev (FY25)<span class="v g">+2.7%</span></li>
+        <li>Mobility Service Rev.<span class="v g">Strong</span></li>
+        <li>Fiber Net Adds (Q4)<span class="v g">307K</span></li>
+        <li>Business Wireline<span class="v r">Declining</span></li>
+        <li>FY26 Rev. Guide<span class="v a">Low-single-digit</span></li>
+      </ul>
+    </div>
+
+    <div class="card green">
+      <div class="card-title"><span class="dot-ind"></span>Returns &amp; Margins</div>
+      <ul>
+        <li>Adj. EBITDA Margin<span class="v g">~37% (Q3)</span></li>
+        <li>Postpaid ARPU Trend<span class="v g">Favorable</span></li>
+        <li>RoIC vs. WACC<span class="v a">Slight +</span></li>
+        <li>EPS Trajectory<span class="v g">FY26 $2.25–2.35</span></li>
+        <li>Shareholder Returns Plan<span class="v g">$45B+ ’26–’28</span></li>
+      </ul>
+    </div>
+    <div class="card green">
+      <div class="card-title"><span class="dot-ind"></span>Cash Flow &amp; Dividend</div>
+      <ul>
+        <li>FCF / Share<span class="v g">Elevated</span></li>
+        <li>Dividend / FCF<span class="v g">Well covered</span></li>
+        <li>Capex Intensity<span class="v a">Fiber build</span></li>
+        <li>Spectrum / M&amp;A<span class="v a">Cash use</span></li>
+        <li>Buybacks<span class="v a">Opportunistic</span></li>
+      </ul>
+    </div>
+    <div class="card amber">
+      <div class="card-title"><span class="dot-ind"></span>Competition &amp; Regulation</div>
+      <ul>
+        <li>U.S. Wireless Oligopoly<span class="v g">Stable</span></li>
+        <li>Cable / Fiber Overbuild<span class="v a">Local pressure</span></li>
+        <li>Regulatory / Pole Access<span class="v a">Friction</span></li>
+        <li>Wholesale / Roaming<span class="v a">Mix risk</span></li>
+        <li>Macro / Rates Path<span class="v a">Sensitivity</span></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="breakdown">
+    <h3>Score Breakdown &middot; Weighted Components</h3>
+    <div class="bar-row">
+      <div class="bar-label">Valuation <span style="color:var(--text-muted);font-size:.7rem">(35%)</span></div>
+      <div class="bar-track">
+        <div class="bar-fill" style="width:40%;background:linear-gradient(90deg,var(--green),#69f0ae)"></div>
+      </div>
+      <div class="bar-num" style="color:var(--green)">14 / 35</div>
+    </div>
+    <div class="bar-row">
+      <div class="bar-label">Financial Health <span style="color:var(--text-muted);font-size:.7rem">(35%)</span></div>
+      <div class="bar-track">
+        <div class="bar-fill" style="width:46%;background:linear-gradient(90deg,var(--amber),#ffd54f)"></div>
+      </div>
+      <div class="bar-num" style="color:var(--amber)">16 / 35</div>
+    </div>
+    <div class="bar-row">
+      <div class="bar-label">Growth <span style="color:var(--text-muted);font-size:.7rem">(30%)</span></div>
+      <div class="bar-track">
+        <div class="bar-fill" style="width:50%;background:linear-gradient(90deg,var(--amber),#ffd54f)"></div>
+      </div>
+      <div class="bar-num" style="color:var(--amber)">15 / 30</div>
+    </div>
+    <div style="text-align:right;font-family:var(--mono);font-size:.85rem;color:var(--text);margin-top:8px;padding-right:0">
+      Composite Score: <span style="color:var(--amber);font-weight:700;font-size:1rem">45 / 100</span>
+      <span style="color:var(--text-muted);font-size:.72rem;margin-left:8px">Higher = Higher Risk</span>
+    </div>
+  </div>
+
+  <div class="report-footer">
+    Data: AT&amp;T IR releases (through Q4 FY25), consensus previews for Q1 FY26, market quotes as of Apr 2026 &middot; Not investment advice
+  </div>
+</div>
+
+<div class="page" id="page2">
+
+  <div style="display:flex;align-items:baseline;gap:16px;margin-bottom:28px">
+    <span style="font-family:var(--mono);font-size:1.3rem;font-weight:700">T</span>
+    <span style="font-size:.85rem;color:var(--text-dim)">Risk Report — Page 2 of 2</span>
+    <span style="margin-left:auto;font-family:var(--mono);font-size:.75rem;color:var(--text-muted)">2026-04-14 21:23:02 CEST</span>
+  </div>
+
+  <div class="section-title">Quarterly Financial Trends</div>
+  <table class="qtable">
+    <thead>
+      <tr>
+        <th>Metric</th>
+        <th>Q1 &apos;25</th>
+        <th>Q2 &apos;25</th>
+        <th>Q3 &apos;25</th>
+        <th>Q4 &apos;25</th>
+        <th style="color:var(--cyan)">Q1 &apos;26 (Est.)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Revenue ($B)</td>
+        <td>30.2</td>
+        <td>30.8</td>
+        <td>30.7</td>
+        <td style="color:var(--green)">33.5</td>
+        <td style="color:var(--text-muted)">~30.9</td>
+      </tr>
+      <tr>
+        <td>Adj. EBITDA ($B)</td>
+        <td>11.3</td>
+        <td>11.6</td>
+        <td style="color:var(--green)">11.9</td>
+        <td>11.2</td>
+        <td style="color:var(--text-muted)">~11.8</td>
+      </tr>
+      <tr>
+        <td>Adj. EPS</td>
+        <td>$0.48</td>
+        <td>$0.54</td>
+        <td>$0.54</td>
+        <td>$0.52</td>
+        <td style="color:var(--text-muted)">~$0.52</td>
+      </tr>
+      <tr>
+        <td>Free Cash Flow ($B)</td>
+        <td>2.9</td>
+        <td>4.1</td>
+        <td>4.2</td>
+        <td style="color:var(--green)">4.2</td>
+        <td style="color:var(--text-muted)">TBD</td>
+      </tr>
+      <tr>
+        <td>Postpaid Phone Net Adds (000)</td>
+        <td style="color:var(--green)">324</td>
+        <td style="color:var(--green)">401</td>
+        <td style="color:var(--green)">405</td>
+        <td style="color:var(--green)">421</td>
+        <td style="color:var(--text-muted)">—</td>
+      </tr>
+      <tr>
+        <td>Fiber Net Adds (000)</td>
+        <td>261</td>
+        <td>243</td>
+        <td style="color:var(--green)">288</td>
+        <td style="color:var(--green)">307</td>
+        <td style="color:var(--text-muted)">—</td>
+      </tr>
+      <tr class="highlight">
+        <td>Adj. EBITDA Margin (rep. qtr.)</td>
+        <td>37.4%</td>
+        <td>37.7%</td>
+        <td style="color:var(--green)">38.8%</td>
+        <td>33.4%</td>
+        <td style="color:var(--text-muted)">—</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="earnings-box">
+    <h4>Latest Earnings &amp; Delivery Context</h4>
+    <p>
+      <strong>Q4 FY25 (reported Jan 26, 2026):</strong> Revenue <strong>$33.5B</strong>, adjusted EPS <strong>$0.52</strong>, adjusted EBITDA <strong>$11.2B</strong>, and free cash flow <strong>$4.2B</strong>. Full-year consolidated revenue reached <strong>$125.6B</strong> with <strong>$16.6B</strong> free cash flow — management indicated guidance was met or exceeded across consolidated targets. Consumer broadband growth was highlighted as the strongest in a decade, with fiber momentum continuing. <strong>Q1 FY26 results</strong> are scheduled for <span class="highlight-date">April 22, 2026</span> (before NYSE open, call 8:30 a.m. ET) — the first quarter under refreshed segment disclosure (Advanced Connectivity, Legacy, Latin America) following the Lumen fiber close (Feb 2, 2026) and EchoStar spectrum licensing, so look-through on fiber ARPU, legacy erosion pace, and integration costs will dominate the narrative.
+    </p>
+  </div>
+
+  <div class="dual">
+    <div class="dual-col catalysts">
+      <h4><span class="ic">▲</span> Catalysts</h4>
+      <ul>
+        <li><strong>Fiber scale + ARPU</strong> — continued AT&amp;T Fiber net adds and converged offers support stable broadband economics.</li>
+        <li><strong>Wireless service revenue strength</strong> — multi-year highs in service revenue growth cited by management through FY25.</li>
+        <li><strong>FCF &amp; capital returns</strong> — elevated FY25 FCF underpins ~4% yield and the communicated <strong>$45B+</strong> shareholder return framework for 2026–2028.</li>
+        <li><strong>Cost discipline / AI ops</strong> — productivity programs and network automation can defend margins against inflation.</li>
+        <li><strong>Strategic assets</strong> — spectrum licenses and fiber footprint improve long-term capacity for 5G &amp; fixed wireless convergence.</li>
+        <li><strong>Multiple re-rating</strong> — low-teens P/E leaves room for modest expansion if FY26 EPS hits the <strong>$2.25–$2.35</strong> guided band.</li>
+      </ul>
+    </div>
+    <div class="dual-col risks">
+      <h4><span class="ic">▼</span> Risks</h4>
+      <ul>
+        <li><strong>Leverage overhang</strong> — net debt ~<strong>$129B</strong> keeps AT&amp;T sensitive to rates, spreads, and M&amp;A execution risk.</li>
+        <li><strong>Legacy wireline drag</strong> — Business Wireline declines can offset connectivity gains if erosion accelerates.</li>
+        <li><strong>Integration complexity</strong> — Lumen fiber + EchoStar spectrum increase execution and capex intensity through 2026.</li>
+        <li><strong>Competitive intensity</strong> — cable fiber overbuild, T-Mobile fixed wireless, and price wars could pressure ARPU.</li>
+        <li><strong>Regulatory / legal</strong> — pole-access disputes, lead-sheath remediation overhang, and recurring legal items remain headline risks.</li>
+        <li><strong>Macro sensitivity</strong> — consumer stress or B2B slowdown would flow quickly into churn, financing costs, and capex flexibility.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="bottom-line">
+    <h3>Bottom Line</h3>
+    <p>
+      AT&amp;T offers a rare combination of <strong>high single-digit earnings multiples</strong>, a <strong>cash-funded dividend</strong>, and <strong>improving connectivity mix</strong> (mobility + fiber) — but the investment case still hinges on <strong>managing net debt</strong> while digesting 2026 integrations and new segment reporting. Risk is <strong>moderate</strong>: balance-sheet weight offsets attractive valuation and cash returns. Income-oriented holders can stay the course into the April 22 print; growth investors should treat T as a <strong>bond-proxy equity</strong> with capped upside unless service-revenue acceleration surprises persist.
+    </p>
+    <div class="rating-bar">
+      <div class="segments">
+        <div class="seg"></div>
+        <div class="seg"></div>
+        <div class="seg active-a"></div>
+        <div class="seg active-a"></div>
+        <div class="seg active-a"></div>
+        <div class="seg active-a"></div>
+        <div class="seg active-g"></div>
+        <div class="seg active-g"></div>
+        <div class="seg active-g"></div>
+        <div class="seg"></div>
+      </div>
+      <div class="verdict">HOLD — MODERATE RISK</div>
+    </div>
+    <div class="rating-labels">
+      <span>Strong Buy</span>
+      <span>Buy</span>
+      <span>Hold</span>
+      <span>Sell</span>
+      <span>Strong Sell</span>
+    </div>
+  </div>
+
+  <div class="report-footer">
+    Not investment advice &middot; Past performance ≠ future results &middot; CET timestamp reflects report generation time
+  </div>
+</div>
+
+<button class="copy-btn" onclick="copyReport()">📋 Copy to Clipboard</button>
+
+<script>
+function copyReport(){
+  const text = [];
+  text.push('T (AT&T) RISK SCORE REPORT — 2026-04-14 21:23:02 CEST');
+  text.push('═'.repeat(50));
+  text.push('Price: $28.33 | YTD: ~+14% | Mkt Cap: ~$198.2B');
+  text.push('52-Week: $22.95 – $29.79 | Div yield ~3.9% | P/E ~9.3×');
+  text.push('');
+  text.push('RISK SCORE: 45/100 — Moderate Risk');
+  text.push('  Valuation:       14/35 (Lower Risk)');
+  text.push('  Financial Health: 16/35 (Moderate Risk)');
+  text.push('  Growth:          15/30 (Moderate Risk)');
+  text.push('');
+  text.push('KEY METRICS');
+  text.push('  FY25 Revenue: $125.6B (+2.7% YoY)');
+  text.push('  FY25 Adj. EBITDA: $46.4B | FCF: $16.6B');
+  text.push('  Net Debt: ~$129B | Net Debt/EBITDA ~2.8×');
+  text.push('  Q4 FY25: Rev $33.5B | Adj EPS $0.52 | FCF $4.2B');
+  text.push('');
+  text.push('VERDICT: HOLD — MODERATE RISK');
+  text.push('Next earnings: April 22, 2026 (Q1 FY26)');
+  text.push('');
+  text.push('Not investment advice.');
+  navigator.clipboard.writeText(text.join('\n')).then(()=>{
+    const btn = document.querySelector('.copy-btn');
+    btn.textContent = '✓ Copied!';
+    btn.style.background = '#00e676';
+    btn.style.color = '#08090d';
+    btn.style.borderColor = '#00e676';
+    setTimeout(()=>{
+      btn.textContent = '📋 Copy to Clipboard';
+      btn.style.background = '';
+      btn.style.color = '';
+      btn.style.borderColor = '';
+    }, 2000);
+  });
+}
+</script>
+
+</body>
+</html>

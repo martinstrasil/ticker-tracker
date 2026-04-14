@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>INTC Risk Score Report — April 2026</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#08090d;--surface:#0e1017;--surface2:#141720;--surface3:#1a1e2a;
+    --border:#1e2330;--border-light:#2a3040;
+    --text:#e8eaf0;--text-dim:#8890a4;--text-muted:#565e74;
+    --green:#00e676;--green-dim:#00e67620;--green-bg:#0a2618;
+    --red:#ff5252;--red-dim:#ff525220;--red-bg:#2a0e0e;
+    --amber:#ffab40;--amber-dim:#ffab4020;--amber-bg:#2a1e0a;
+    --blue:#448aff;--blue-dim:#448aff20;
+    --cyan:#18ffff;
+    --mono:'JetBrains Mono',monospace;
+    --sans:'DM Sans',sans-serif;
+    --page-w:1080px;
+  }
+  html{font-size:14px}
+  body{background:var(--bg);color:var(--text);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
+
+  .page{max-width:var(--page-w);margin:0 auto;padding:48px 40px;min-height:100vh;position:relative}
+  .page+.page{border-top:1px solid var(--border)}
+  .page::before{content:'';position:absolute;top:0;left:0;right:0;height:260px;background:linear-gradient(180deg,#ffab4008 0%,transparent 100%);pointer-events:none}
+
+  @media print{.page{page-break-before:always;padding:24px}}
+
+  .stock-bar{display:flex;align-items:center;gap:20px;padding:16px 24px;background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:32px;position:relative;overflow:hidden}
+  .stock-bar::after{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--amber),transparent)}
+  .stock-bar .ticker{font-family:var(--mono);font-size:1.7rem;font-weight:700;letter-spacing:-.02em;color:var(--text)}
+  .stock-bar .company{font-size:.95rem;color:var(--text-dim);margin-left:-8px}
+  .stock-bar .price-block{margin-left:auto;text-align:right}
+  .stock-bar .price{font-family:var(--mono);font-size:1.6rem;font-weight:600}
+  .stock-bar .change{font-family:var(--mono);font-size:.85rem;padding:3px 10px;border-radius:6px;display:inline-block;margin-top:2px}
+  .stock-bar .change.neg{color:var(--red);background:var(--red-dim)}
+  .stock-bar .change.pos{color:var(--green);background:var(--green-dim)}
+  .stock-bar .change.wa{color:var(--amber);background:var(--amber-dim)}
+  .stock-bar .meta{font-family:var(--mono);font-size:.75rem;color:var(--text-muted);display:flex;flex-direction:column;gap:2px;min-width:168px}
+  .stock-bar .dot{width:8px;height:8px;border-radius:50%;background:var(--amber);box-shadow:0 0 8px var(--amber);animation:pulse 2s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+  .gauge-row{display:flex;align-items:center;gap:40px;margin-bottom:36px}
+  .gauge-wrap{width:220px;flex-shrink:0;position:relative}
+  .gauge-wrap svg{width:100%;display:block}
+  .gauge-label{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);text-align:center}
+  .gauge-label .num{font-family:var(--mono);font-size:2.8rem;font-weight:700;line-height:1;color:var(--amber)}
+  .gauge-label .sub{font-size:.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.12em;margin-top:2px}
+  .score-desc{flex:1}
+  .score-desc h2{font-size:1.1rem;font-weight:600;margin-bottom:6px;color:var(--amber)}
+  .score-desc p{font-size:.88rem;color:var(--text-dim);line-height:1.6;max-width:520px}
+
+  .kpi-strip{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:36px}
+  .kpi{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;position:relative;overflow:hidden}
+  .kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+  .kpi.g::before{background:var(--green)}.kpi.r::before{background:var(--red)}.kpi.a::before{background:var(--amber)}.kpi.b::before{background:var(--blue)}
+  .kpi .label{font-size:.65rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);margin-bottom:6px}
+  .kpi .val{font-family:var(--mono);font-size:1.15rem;font-weight:600}
+  .kpi .sub{font-family:var(--mono);font-size:.7rem;color:var(--text-muted);margin-top:2px}
+
+  .chart-section{margin-bottom:36px}
+  .chart-section h3{font-size:.75rem;text-transform:uppercase;letter-spacing:.12em;color:var(--text-muted);margin-bottom:12px}
+  .chart-box{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px 24px 16px;position:relative;overflow:hidden}
+  .chart-box svg{width:100%;display:block}
+
+  .card-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:36px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px 20px;position:relative;overflow:hidden}
+  .card::before{content:'';position:absolute;top:0;left:0;width:3px;height:100%;border-radius:0 3px 3px 0}
+  .card.green::before{background:var(--green)}.card.red::before{background:var(--red)}.card.amber::before{background:var(--amber)}
+  .card .card-title{font-size:.7rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);margin-bottom:10px;display:flex;align-items:center;gap:8px}
+  .card .card-title .dot-ind{width:6px;height:6px;border-radius:50%}
+  .card.green .dot-ind{background:var(--green)}.card.red .dot-ind{background:var(--red)}.card.amber .dot-ind{background:var(--amber)}
+  .card ul{list-style:none;padding:0}
+  .card li{font-size:.82rem;color:var(--text-dim);padding:4px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+  .card li:last-child{border:none}
+  .card li .v{font-family:var(--mono);font-weight:500;font-size:.8rem}
+  .card li .v.g{color:var(--green)}.card li .v.r{color:var(--red)}.card li .v.a{color:var(--amber)}
+
+  .breakdown{margin-bottom:16px}
+  .breakdown h3{font-size:.75rem;text-transform:uppercase;letter-spacing:.12em;color:var(--text-muted);margin-bottom:14px}
+  .bar-row{display:flex;align-items:center;gap:14px;margin-bottom:10px}
+  .bar-row .bar-label{font-size:.8rem;color:var(--text-dim);width:140px;flex-shrink:0}
+  .bar-row .bar-track{flex:1;height:10px;background:var(--surface2);border-radius:5px;overflow:hidden;position:relative}
+  .bar-row .bar-fill{height:100%;border-radius:5px;position:relative}
+  .bar-row .bar-fill::after{content:'';position:absolute;top:0;right:0;bottom:0;width:40%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.12))}
+  .bar-row .bar-num{font-family:var(--mono);font-size:.8rem;font-weight:600;width:60px;text-align:right;flex-shrink:0}
+
+  .qtable{width:100%;border-collapse:collapse;margin-bottom:36px;font-size:.82rem}
+  .qtable th{font-size:.65rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);font-weight:500;padding:10px 12px;text-align:right;border-bottom:1px solid var(--border-light)}
+  .qtable th:first-child{text-align:left}
+  .qtable td{font-family:var(--mono);font-weight:400;padding:10px 12px;text-align:right;border-bottom:1px solid var(--border);color:var(--text-dim)}
+  .qtable td:first-child{font-family:var(--sans);color:var(--text);text-align:left;font-weight:500}
+  .qtable tr:hover td{background:var(--surface)}
+  .qtable .highlight td{background:var(--surface2);color:var(--text)}
+
+  .dual{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:36px}
+  .dual-col{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px 22px}
+  .dual-col h4{font-size:.7rem;text-transform:uppercase;letter-spacing:.12em;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+  .dual-col h4 .ic{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.65rem}
+  .dual-col.catalysts h4{color:var(--green)}.dual-col.catalysts h4 .ic{background:var(--green-dim);color:var(--green)}
+  .dual-col.risks h4{color:var(--red)}.dual-col.risks h4 .ic{background:var(--red-dim);color:var(--red)}
+  .dual-col li{font-size:.82rem;color:var(--text-dim);padding:6px 0;border-bottom:1px solid var(--border);line-height:1.5}
+  .dual-col li:last-child{border:none}
+  .dual-col ul{list-style:none;padding:0}
+
+  .earnings-box{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px 24px;margin-bottom:36px}
+  .earnings-box h4{font-size:.7rem;text-transform:uppercase;letter-spacing:.12em;color:var(--text-muted);margin-bottom:10px}
+  .earnings-box p{font-size:.88rem;color:var(--text-dim);line-height:1.65}
+  .earnings-box .highlight-date{font-family:var(--mono);color:var(--cyan);font-weight:500}
+
+  .bottom-line{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px 28px;position:relative;overflow:hidden}
+  .bottom-line::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--red),var(--amber),var(--green))}
+  .bottom-line h3{font-size:.95rem;font-weight:600;margin-bottom:8px;color:var(--text)}
+  .bottom-line p{font-size:.88rem;color:var(--text-dim);line-height:1.65;margin-bottom:16px}
+  .rating-bar{display:flex;align-items:center;gap:16px;margin-top:14px}
+  .rating-bar .segments{display:flex;gap:3px;flex:1}
+  .rating-bar .seg{height:8px;flex:1;border-radius:4px;background:var(--surface2)}
+  .rating-bar .seg.active-r{background:var(--red)}.rating-bar .seg.active-a{background:var(--amber)}.rating-bar .seg.active-g{background:var(--green)}
+  .rating-bar .verdict{font-family:var(--mono);font-size:.95rem;font-weight:700;color:var(--amber);white-space:nowrap}
+  .rating-labels{display:flex;justify-content:space-between;margin-top:6px;font-size:.6rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted)}
+
+  .copy-btn{position:fixed;bottom:24px;right:24px;background:var(--surface2);border:1px solid var(--border-light);color:var(--text-dim);font-family:var(--mono);font-size:.75rem;padding:10px 18px;border-radius:8px;cursor:pointer;z-index:100;transition:all .2s}
+  .copy-btn:hover{background:var(--blue);color:#fff;border-color:var(--blue)}
+
+  .section-title{font-size:.75rem;text-transform:uppercase;letter-spacing:.12em;color:var(--text-muted);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+
+  .report-footer{text-align:center;padding:20px 0 0;font-size:.65rem;color:var(--text-muted);border-top:1px solid var(--border);margin-top:32px}
+
+  @media(max-width:800px){
+    .kpi-strip{grid-template-columns:repeat(3,1fr)}
+    .card-grid{grid-template-columns:1fr}
+    .dual{grid-template-columns:1fr}
+    .stock-bar{flex-wrap:wrap}
+    .gauge-row{flex-direction:column;align-items:flex-start}
+  }
+</style>
+</head>
+<body>
+
+<!-- ========== PAGE 1 ========== -->
+<div class="page" id="page1">
+
+  <div style="display:flex;align-items:center;justify-content:flex-end;margin-bottom:14px">
+    <span style="font-family:var(--mono);font-size:.7rem;color:var(--text-muted);letter-spacing:.04em" id="analysis-ts">2026-04-14 21:21:39 CET</span>
+  </div>
+
+  <div class="stock-bar">
+    <div class="dot"></div>
+    <div>
+      <div class="ticker">INTC</div>
+      <div class="company">Intel Corporation &middot; NASDAQ</div>
+    </div>
+    <div class="meta">
+      <span>Mkt Cap <b style="color:var(--text)">~$278B</b></span>
+      <span>52w <b style="color:var(--text)">$36.20 – $68.40</b></span>
+      <span>Vol <b style="color:var(--text)">Elevated</b></span>
+    </div>
+    <div class="price-block">
+      <div class="price">$63.57</div>
+      <div class="change wa">Apr 14 &middot; ~−5% from streak high</div>
+    </div>
+  </div>
+
+  <div class="gauge-row">
+    <div class="gauge-wrap">
+      <svg viewBox="0 0 200 120" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="gaugeBg" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#1a1e2a"/>
+            <stop offset="100%" stop-color="#1a1e2a"/>
+          </linearGradient>
+          <linearGradient id="gaugeGrad" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#00e676"/>
+            <stop offset="40%" stop-color="#ffab40"/>
+            <stop offset="100%" stop-color="#ff5252"/>
+          </linearGradient>
+        </defs>
+        <path d="M 20 105 A 80 80 0 0 1 180 105" fill="none" stroke="url(#gaugeBg)" stroke-width="12" stroke-linecap="round"/>
+        <path d="M 20 105 A 80 80 0 0 1 180 105" fill="none" stroke="url(#gaugeGrad)" stroke-width="12" stroke-linecap="round" stroke-dasharray="251" stroke-dashoffset="80" opacity=".9"/>
+        <text x="14" y="115" font-family="JetBrains Mono" font-size="8" fill="#565e74">0</text>
+        <text x="93" y="20" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">50</text>
+        <text x="178" y="115" font-family="JetBrains Mono" font-size="8" fill="#565e74">100</text>
+        <circle cx="143" cy="36" r="4" fill="#ffab40" opacity=".95"/>
+      </svg>
+      <div class="gauge-label">
+        <div class="num">68</div>
+        <div class="sub">Risk Score</div>
+      </div>
+    </div>
+    <div class="score-desc">
+      <h2>Elevated Risk — Sentiment vs. Fundamentals Diverged</h2>
+      <p>Intel’s 2026 tape reflects a powerful narrative bid (AI CPU relevance, 18A ramp, strategic headlines) layered on still-delicate fundamentals: GAAP remained in the red in Q4, Q1 guidance embeds supply trough plus breakeven non-GAAP EPS at the midpoint, and Street multiples have expanded sharply after the YTD surge. The setup favors disciplined position sizing into the Q1 print and proof of margin/supply recovery.</p>
+    </div>
+  </div>
+
+  <div class="kpi-strip">
+    <div class="kpi r">
+      <div class="label">Fwd P/E (cons.)</div>
+      <div class="val" style="color:var(--red)">~120×+</div>
+      <div class="sub">Multiple expansion</div>
+    </div>
+    <div class="kpi a">
+      <div class="label">FY25 Revenue</div>
+      <div class="val">$52.9B</div>
+      <div class="sub" style="color:var(--amber)">Flat YoY</div>
+    </div>
+    <div class="kpi g">
+      <div class="label">FY25 OCF</div>
+      <div class="val" style="color:var(--green)">$9.7B</div>
+      <div class="sub">Cash generation</div>
+    </div>
+    <div class="kpi a">
+      <div class="label">Q4 nGAAP EPS</div>
+      <div class="val" style="color:var(--green)">$0.15</div>
+      <div class="sub">Beat; GAAP $(0.12)</div>
+    </div>
+    <div class="kpi r">
+      <div class="label">Q1 &rsquo;26 Guide</div>
+      <div class="val" style="color:var(--amber)">$11.7–12.7B</div>
+      <div class="sub">Supply-limited</div>
+    </div>
+    <div class="kpi b">
+      <div class="label">Next Earnings</div>
+      <div class="val" style="color:var(--cyan)">Apr 23</div>
+      <div class="sub">Q1 &rsquo;26 · After close</div>
+    </div>
+  </div>
+
+  <div class="chart-section">
+    <h3>12-Month Price Action &middot; INTC</h3>
+    <div class="chart-box">
+      <svg viewBox="0 0 1000 300" xmlns="http://www.w3.org/2000/svg" style="overflow:visible">
+        <defs>
+          <linearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#ffab40" stop-opacity=".16"/>
+            <stop offset="100%" stop-color="#ffab40" stop-opacity="0"/>
+          </linearGradient>
+          <linearGradient id="lineGrad" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#448aff"/>
+            <stop offset="45%" stop-color="#00e676"/>
+            <stop offset="100%" stop-color="#ffab40"/>
+          </linearGradient>
+        </defs>
+        <line x1="60" y1="20" x2="60" y2="260" stroke="#1e2330" stroke-width=".5"/>
+        <line x1="60" y1="260" x2="980" y2="260" stroke="#1e2330" stroke-width=".5"/>
+        <line x1="60" y1="72" x2="980" y2="72" stroke="#1e2330" stroke-width=".5" stroke-dasharray="4"/>
+        <line x1="60" y1="124" x2="980" y2="124" stroke="#1e2330" stroke-width=".5" stroke-dasharray="4"/>
+        <line x1="60" y1="176" x2="980" y2="176" stroke="#1e2330" stroke-width=".5" stroke-dasharray="4"/>
+        <line x1="60" y1="228" x2="980" y2="228" stroke="#1e2330" stroke-width=".5" stroke-dasharray="4"/>
+        <text x="50" y="24" font-family="JetBrains Mono" font-size="9" fill="#565e74" text-anchor="end">$72</text>
+        <text x="50" y="76" font-family="JetBrains Mono" font-size="9" fill="#565e74" text-anchor="end">$58</text>
+        <text x="50" y="128" font-family="JetBrains Mono" font-size="9" fill="#565e74" text-anchor="end">$44</text>
+        <text x="50" y="180" font-family="JetBrains Mono" font-size="9" fill="#565e74" text-anchor="end">$34</text>
+        <text x="50" y="232" font-family="JetBrains Mono" font-size="9" fill="#565e74" text-anchor="end">$26</text>
+        <text x="50" y="264" font-family="JetBrains Mono" font-size="9" fill="#565e74" text-anchor="end">$18</text>
+        <text x="80" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Apr</text>
+        <text x="155" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">May</text>
+        <text x="230" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Jun</text>
+        <text x="305" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Jul</text>
+        <text x="380" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Aug</text>
+        <text x="455" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Sep</text>
+        <text x="530" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Oct</text>
+        <text x="605" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Nov</text>
+        <text x="680" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Dec</text>
+        <text x="755" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Jan</text>
+        <text x="830" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Feb</text>
+        <text x="905" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Mar</text>
+        <text x="960" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Apr</text>
+        <path d="M 80,188 L 155,196 230,202 305,210 380,198 455,184 530,168 605,152 680,138 755,118 830,88 905,42 960,58 L 960,260 80,260 Z" fill="url(#chartFill)"/>
+        <polyline points="80,188 155,196 230,202 305,210 380,198 455,184 530,168 605,152 680,138 755,118 830,88 905,42 960,58" fill="none" stroke="url(#lineGrad)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+        <circle cx="80" cy="188" r="3" fill="#448aff"/>
+        <circle cx="530" cy="168" r="4" fill="#00e676" stroke="#08090d" stroke-width="2"/>
+        <circle cx="905" cy="42" r="4" fill="#ffab40" stroke="#08090d" stroke-width="2"/>
+        <circle cx="960" cy="58" r="4" fill="#ff5252" stroke="#08090d" stroke-width="2"/>
+
+        <line x1="530" y1="168" x2="530" y2="188" stroke="#00e676" stroke-width=".8" stroke-dasharray="3"/>
+        <rect x="448" y="190" width="164" height="18" rx="4" fill="#0a2618" stroke="#00e676" stroke-width=".5"/>
+        <text x="530" y="202" font-family="JetBrains Mono" font-size="7.5" fill="#00e676" text-anchor="middle">Q3 Beat &middot; Return to growth</text>
+
+        <line x1="755" y1="118" x2="755" y2="132" stroke="#448aff" stroke-width=".8" stroke-dasharray="3"/>
+        <rect x="668" y="100" width="174" height="16" rx="4" fill="#141720" stroke="#448aff" stroke-width=".5"/>
+        <text x="755" y="111" font-family="JetBrains Mono" font-size="7.5" fill="#448aff" text-anchor="middle">Q4 Print · Jan 22 &middot; Rev/EPS beat</text>
+
+        <line x1="905" y1="42" x2="905" y2="62" stroke="#ffab40" stroke-width=".8" stroke-dasharray="3"/>
+        <rect x="818" y="64" width="174" height="16" rx="4" fill="#2a1e0a" stroke="#ffab40" stroke-width=".5"/>
+        <text x="905" y="75" font-family="JetBrains Mono" font-size="7.5" fill="#ffab40" text-anchor="middle">2026 narrative rally / strategic headlines</text>
+
+        <line x1="960" y1="58" x2="960" y2="78" stroke="#ff5252" stroke-width=".8" stroke-dasharray="3"/>
+        <rect x="878" y="80" width="164" height="16" rx="4" fill="#2a0e0e" stroke="#ff5252" stroke-width=".5"/>
+        <text x="960" y="91" font-family="JetBrains Mono" font-size="7.5" fill="#ff5252" text-anchor="middle">Apr pullback · profit-taking</text>
+      </svg>
+    </div>
+  </div>
+
+  <div class="section-title">Fundamental Scorecard</div>
+  <div class="card-grid">
+    <div class="card red">
+      <div class="card-title"><span class="dot-ind"></span>Valuation · Multiples</div>
+      <ul>
+        <li>Forward P/E<span class="v r">Extreme vs hist.</span></li>
+        <li>EV / Sales<span class="v a">Rich post-rally</span></li>
+        <li>P/B vs fabs<span class="v a">Turnaround premium</span></li>
+        <li>FCF Yield<span class="v a">Thin at spot</span></li>
+        <li>Analyst breadth<span class="v r">Few outright Buys</span></li>
+      </ul>
+    </div>
+    <div class="card amber">
+      <div class="card-title"><span class="dot-ind"></span>Valuation · Expectations</div>
+      <ul>
+        <li>Price vs Q1 guide<span class="v a">High bar</span></li>
+        <li>Optionality (18A)<span class="v g">Strategic value</span></li>
+        <li>Strategic stakes<span class="v g">NVDA $5B equity</span></li>
+        <li>Apollo fabs<span class="v g">~$14B offload</span></li>
+        <li>Volatility<span class="v r">Gap risk</span></li>
+      </ul>
+    </div>
+    <div class="card green">
+      <div class="card-title"><span class="dot-ind"></span>Financial Health · Liquidity</div>
+      <ul>
+        <li>Q4 OCF<span class="v g">$4.3B</span></li>
+        <li>FY25 OCF<span class="v g">$9.7B</span></li>
+        <li>Cash discipline<span class="v g">OpEx down YoY</span></li>
+        <li>Strategic funding<span class="v g">Gov / partners</span></li>
+        <li>GAAP net (FY)<span class="v r">$(0.3)B</span></li>
+      </ul>
+    </div>
+    <div class="card amber">
+      <div class="card-title"><span class="dot-ind"></span>Financial Health · Margins</div>
+      <ul>
+        <li>Q4 GAAP GM<span class="v r">36.1%</span></li>
+        <li>Q4 nGAAP GM<span class="v a">37.9%</span></li>
+        <li>Q1 &rsquo;26 GM guide<span class="v a">34.5% nGAAP mid</span></li>
+        <li>Foundry losses<span class="v a">Still dragging</span></li>
+        <li>Tax / GAAP noise<span class="v a">198% GAAP tax Q4</span></li>
+      </ul>
+    </div>
+    <div class="card amber">
+      <div class="card-title"><span class="dot-ind"></span>Growth · Demand</div>
+      <ul>
+        <li>DCAI (Q4)<span class="v g">+9% YoY</span></li>
+        <li>CCG (Q4)<span class="v r">−7% YoY</span></li>
+        <li>Total rev (Q4)<span class="v r">−4% YoY</span></li>
+        <li>AI / Xeon narrative<span class="v g">Hyperscale wins</span></li>
+        <li>Supply vs demand<span class="v a">Q1 trough</span></li>
+      </ul>
+    </div>
+    <div class="card green">
+      <div class="card-title"><span class="dot-ind"></span>Growth · Technology</div>
+      <ul>
+        <li>Intel 18A<span class="v g">HVM milestone</span></li>
+        <li>Core Ultra Series 3<span class="v g">AI PC ramp</span></li>
+        <li>Foundry ext. rev<span class="v g">+4% YoY Q4</span></li>
+        <li>Edge / Cisco<span class="v g">Xeon 6 edge AI</span></li>
+        <li>Yield ramp risk<span class="v a">Execution-sensitive</span></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="breakdown">
+    <h3>Score Breakdown &middot; Weighted Components</h3>
+    <div class="bar-row">
+      <div class="bar-label">Valuation <span style="color:var(--text-muted);font-size:.7rem">(35%)</span></div>
+      <div class="bar-track">
+        <div class="bar-fill" style="width:77%;background:linear-gradient(90deg,var(--red),#ff8a80)"></div>
+      </div>
+      <div class="bar-num" style="color:var(--red)">27 / 35</div>
+    </div>
+    <div class="bar-row">
+      <div class="bar-label">Financial Health <span style="color:var(--text-muted);font-size:.7rem">(35%)</span></div>
+      <div class="bar-track">
+        <div class="bar-fill" style="width:57%;background:linear-gradient(90deg,var(--amber),#ffd54f)"></div>
+      </div>
+      <div class="bar-num" style="color:var(--amber)">20 / 35</div>
+    </div>
+    <div class="bar-row">
+      <div class="bar-label">Growth <span style="color:var(--text-muted);font-size:.7rem">(30%)</span></div>
+      <div class="bar-track">
+        <div class="bar-fill" style="width:70%;background:linear-gradient(90deg,var(--amber),#ffd54f)"></div>
+      </div>
+      <div class="bar-num" style="color:var(--amber)">21 / 30</div>
+    </div>
+    <div style="text-align:right;font-family:var(--mono);font-size:.85rem;color:var(--text);margin-top:8px;padding-right:0">
+      Composite Score: <span style="color:var(--amber);font-weight:700;font-size:1rem">68 / 100</span>
+      <span style="color:var(--text-muted);font-size:.72rem;margin-left:8px">Higher = Higher Risk</span>
+    </div>
+  </div>
+
+  <div class="report-footer">
+    Data: Intel Q4/FY25 earnings release (Jan 22, 2026), IR calendar, financial media (Apr 14, 2026) &middot; Not investment advice
+  </div>
+</div>
+
+<!-- ========== PAGE 2 ========== -->
+<div class="page" id="page2">
+
+  <div style="display:flex;align-items:baseline;gap:16px;margin-bottom:28px">
+    <span style="font-family:var(--mono);font-size:1.3rem;font-weight:700">INTC</span>
+    <span style="font-size:.85rem;color:var(--text-dim)">Risk Report — Page 2 of 2</span>
+    <span style="margin-left:auto;font-family:var(--mono);font-size:.75rem;color:var(--text-muted)">2026-04-14 21:21:39 CET</span>
+  </div>
+
+  <div class="section-title">Quarterly Financial Trends</div>
+  <table class="qtable">
+    <thead>
+      <tr>
+        <th>Metric</th>
+        <th>Q1 &rsquo;25</th>
+        <th>Q2 &rsquo;25</th>
+        <th>Q3 &rsquo;25</th>
+        <th>Q4 &rsquo;25</th>
+        <th style="color:var(--cyan)">Q1 &rsquo;26 (Guide)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Revenue ($B)</td>
+        <td>12.7</td>
+        <td>12.9</td>
+        <td style="color:var(--green)">13.7</td>
+        <td>13.7</td>
+        <td style="color:var(--text-muted)">11.7–12.7</td>
+      </tr>
+      <tr>
+        <td>Non-GAAP EPS</td>
+        <td style="color:var(--green)">$0.13</td>
+        <td style="color:var(--red)">$(0.10)</td>
+        <td style="color:var(--green)">$0.23</td>
+        <td style="color:var(--green)">$0.15</td>
+        <td style="color:var(--text-muted)">$0.00 (mid)</td>
+      </tr>
+      <tr>
+        <td>nGAAP Gross Margin</td>
+        <td>~39%</td>
+        <td>—</td>
+        <td style="color:var(--green)">~40%</td>
+        <td>37.9%</td>
+        <td style="color:var(--text-muted)">34.5%</td>
+      </tr>
+      <tr>
+        <td>OCF ($B)</td>
+        <td>—</td>
+        <td>—</td>
+        <td>—</td>
+        <td style="color:var(--green)">4.3</td>
+        <td style="color:var(--text-muted)">TBD</td>
+      </tr>
+      <tr class="highlight">
+        <td>YoY revenue growth (rep.)</td>
+        <td style="color:var(--amber)">Flat</td>
+        <td style="color:var(--amber)">Flat</td>
+        <td style="color:var(--green)">+3%</td>
+        <td style="color:var(--red)">−4%</td>
+        <td style="color:var(--text-muted)">Supply-limited</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="earnings-box">
+    <h4>Latest Earnings &amp; Delivery Update</h4>
+    <p>
+      On <span class="highlight-date">January 22, 2026</span>, Intel reported <strong>Q4 2025 revenue of $13.7 billion</strong> (down 4% YoY; not adjusted for Altera deconsolidation) with <strong>non-GAAP EPS of $0.15</strong> vs. <strong>GAAP EPS of $(0.12)</strong>. Full-year 2025 revenue was <strong>$52.9 billion</strong> (flat YoY) with <strong>$9.7 billion</strong> operating cash flow. Management guided <strong>Q1 2026 revenue of $11.7B–$12.7B</strong>, <strong>non-GAAP EPS of $0.00</strong> at the revenue midpoint, and flagged <strong>lowest available supply in Q1 improving through Q2+</strong> (CFO commentary). Product delivery milestones include <strong>Intel 18A high-volume manufacturing</strong> in the U.S. and the <strong>Core Ultra Series 3</strong> AI PC platform ramp. Next catalyst: <span class="highlight-date">April 23, 2026</span> Q1 results (after market close; webcast per Intel IR calendar).
+    </p>
+  </div>
+
+  <div class="dual">
+    <div class="dual-col catalysts">
+      <h4><span class="ic">▲</span> Catalysts</h4>
+      <ul>
+        <li><strong>18A / U.S. manufacturing</strong> — process credibility and sovereign supply chain narrative</li>
+        <li><strong>AI CPU &amp; Xeon 6 traction</strong> — hyperscaler CPU refresh and edge AI partnerships (e.g., Cisco)</li>
+        <li><strong>Balance-sheet optionality</strong> — NVIDIA $5B equity stake completed; strategic financing flexibility</li>
+        <li><strong>Fab capital structure</strong> — Apollo-led ~$14B U.S. fab asset stake (headline capital recycling)</li>
+        <li><strong>DCAI growth</strong> — Q4 DCAI revenue +9% YoY in reported results</li>
+        <li><strong>Q1 print Apr 23</strong> — first proof point on supply recovery vs. breakeven EPS guide</li>
+      </ul>
+    </div>
+    <div class="dual-col risks">
+      <h4><span class="ic">▼</span> Risks</h4>
+      <ul>
+        <li><strong>Multiple compression</strong> — sharp rally embeds perfection; pullback volatility (e.g., Apr 2026 tape)</li>
+        <li><strong>GAAP profitability</strong> — continued GAAP losses / tax-line complexity vs. headline beats</li>
+        <li><strong>Q1 supply trough</strong> — revenue/EPS guide implies constrained shipments and weak seasonality</li>
+        <li><strong>Foundry economics</strong> — scale losses until external customers ramp meaningfully</li>
+        <li><strong>Client weakness</strong> — CCG revenue −7% YoY in Q4 highlights PC cycle exposure</li>
+        <li><strong>Competitive intensity</strong> — AMD, Arm, and custom silicon cap pricing power in key sockets</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="bottom-line">
+    <h3>Bottom Line</h3>
+    <p>
+      Intel is simultaneously executing a credible technology story (18A, AI PC, data-center CPUs) and asking investors to underwrite a volatile transition: GAAP earnings remain messy, Q1 is explicitly supply-gated, and the equity has re-rated aggressively into that uncertainty. Long-term bulls are paying a tactical premium; bears focus on forward multiple stretch and the gap between narrative and near-term EPS power.
+    </p>
+    <div class="rating-bar">
+      <div class="segments">
+        <div class="seg"></div>
+        <div class="seg"></div>
+        <div class="seg active-a"></div>
+        <div class="seg active-a"></div>
+        <div class="seg active-a"></div>
+        <div class="seg active-a"></div>
+        <div class="seg active-a"></div>
+        <div class="seg"></div>
+        <div class="seg"></div>
+        <div class="seg"></div>
+      </div>
+      <div class="verdict">HOLD — ELEVATED RISK</div>
+    </div>
+    <div class="rating-labels">
+      <span>Strong Buy</span>
+      <span>Buy</span>
+      <span>Hold</span>
+      <span>Sell</span>
+      <span>Strong Sell</span>
+    </div>
+  </div>
+
+  <div class="report-footer">
+    Sources: Intel Exhibit 99.1 (Q4/FY25), intc.com IR calendar, CNBC/Morningstar summaries, trade press (Apr 2026) &middot; Not investment advice &middot; Past performance ≠ future results
+  </div>
+</div>
+
+<button class="copy-btn" onclick="copyReport()">📋 Copy to Clipboard</button>
+
+<script>
+function copyReport(){
+  const text = [];
+  text.push('INTC RISK SCORE REPORT — 2026-04-14 21:21:39 CET');
+  text.push('═'.repeat(50));
+  text.push('Price: $63.57 | 52w: $36.20 – $68.40 | Mkt Cap: ~$278B');
+  text.push('FY25 Revenue $52.9B (flat) | FY25 OCF $9.7B | Q4 nGAAP EPS $0.15');
+  text.push('');
+  text.push('RISK SCORE: 68/100 — Elevated Risk (Higher = Higher Risk)');
+  text.push('  Valuation:   27/35');
+  text.push('  Fin Health:  20/35');
+  text.push('  Growth:      21/30');
+  text.push('');
+  text.push('KEY METRICS');
+  text.push('  Q4 25 Revenue: $13.7B (−4% YoY rep.)');
+  text.push('  Q4 25 nGAAP EPS: $0.15 | GAAP EPS: $(0.12)');
+  text.push('  Q1 26 Guide: $11.7–12.7B rev; $0.00 nGAAP EPS (mid); supply improves Q2+');
+  text.push('');
+  text.push('VERDICT: HOLD — ELEVATED RISK');
+  text.push('Next earnings: April 23, 2026 (after close)');
+  text.push('');
+  text.push('Not investment advice.');
+
+  navigator.clipboard.writeText(text.join('\n')).then(()=>{
+    const btn = document.querySelector('.copy-btn');
+    btn.textContent = '✓ Copied!';
+    btn.style.background = '#00e676';
+    btn.style.color = '#08090d';
+    btn.style.borderColor = '#00e676';
+    setTimeout(()=>{
+      btn.textContent = '📋 Copy to Clipboard';
+      btn.style.background = '';
+      btn.style.color = '';
+      btn.style.borderColor = '';
+    }, 2000);
+  });
+}
+</script>
+
+</body>
+</html>

@@ -3,7 +3,11 @@ const path = require("path");
 
 const REPORTS_DIR = path.join(__dirname, "reports");
 const DIST_DIR = path.join(__dirname, "dist");
-const FILENAME_RE = /^([A-Z]+)_(\d{4}-\d{2}-\d{2})T(\d{2})(\d{2})\.html$/;
+/** ISO-style: TICKER_YYYY-MM-DDTHH-MM-SS+ZZZZ.html (CET/UTC offset) */
+const FILENAME_RE_ISO =
+  /^([A-Z]+)_(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})([+-]\d{2,4})\.html$/;
+/** Legacy: TICKER_YYYY-MM-DDTHHmm.html */
+const FILENAME_RE_LEGACY = /^([A-Z]+)_(\d{4}-\d{2}-\d{2})T(\d{2})(\d{2})\.html$/;
 
 /**
  * Extract text content between an opening tag pattern and its closing tag.
@@ -18,22 +22,74 @@ function extract(html, pattern) {
 }
 
 /**
+ * Derive trading signal from the verdict line (leading word before the em dash).
+ * @param {string} verdict - Full verdict text from the report
+ * @returns {"buy"|"hold"|"sell"} Normalized signal, defaulting to hold if unknown
+ */
+function parseSignal(verdict) {
+  const m = verdict.match(/^([A-Za-z]+)/);
+  const word = m ? m[1].toUpperCase() : "";
+  if (word === "BUY" || word === "HOLD" || word === "SELL") {
+    return word.toLowerCase();
+  }
+  return "hold";
+}
+
+const ALLOWED_COLOR_TOKENS = new Set(["green", "amber", "red", "cyan", "blue"]);
+
+/**
+ * Read the report CSS token used for the large gauge number (matches child `.gauge-label .num`).
+ * @param {string} html - Full report HTML
+ * @returns {string} Token name without `--`, e.g. `green`
+ */
+function extractGaugeNumColorToken(html) {
+  const m = html.match(/\.gauge-label\s*\.num\s*\{[^}]*?color:\s*var\(--([a-z0-9-]+)\)/i);
+  const token = m ? m[1].toLowerCase() : "amber";
+  return ALLOWED_COLOR_TOKENS.has(token) ? token : "amber";
+}
+
+/**
+ * Read the report CSS token for the bottom-line verdict label (matches child `.rating-bar .verdict`).
+ * @param {string} html - Full report HTML
+ * @returns {string} Token name without `--`
+ */
+function extractVerdictBarColorToken(html) {
+  const m = html.match(/\.rating-bar\s*\.verdict\s*\{[^}]*?color:\s*var\(--([a-z0-9-]+)\)/i);
+  const token = m ? m[1].toLowerCase() : "amber";
+  return ALLOWED_COLOR_TOKENS.has(token) ? token : "amber";
+}
+
+/**
  * Parse a single report HTML file and return structured metadata.
  * @param {string} filename - e.g. "TSLA_2026-04-14T1342.html"
  * @param {string} html - Full HTML content of the report
  * @returns {object|null} Report metadata object, or null if filename doesn't match
  */
 function parseReport(filename, html) {
-  const m = filename.match(FILENAME_RE);
-  if (!m) return null;
+  const iso = filename.match(FILENAME_RE_ISO);
+  const leg = filename.match(FILENAME_RE_LEGACY);
+  if (!iso && !leg) return null;
 
-  const [, ticker, date, hh, mm] = m;
-  const time = `${hh}:${mm}`;
+  let ticker;
+  let date;
+  let time;
+  if (iso) {
+    const [, t, d, hh, mm, ss] = iso;
+    ticker = t;
+    date = d;
+    time = `${hh}:${mm}:${ss}`;
+  } else {
+    const [, t, d, hh, mm] = leg;
+    ticker = t;
+    date = d;
+    time = `${hh}:${mm}`;
+  }
 
   const company = extract(html, 'class="company"').replace(/&middot;/g, "\u00B7");
   const price = extract(html, 'class="price"');
   const riskScoreRaw = extract(html, 'class="num"');
   const verdict = extract(html, 'class="verdict"').replace(/\u2014/g, "\u2014");
+  const signal = parseSignal(verdict);
 
   const changeMatch = html.match(/<div class="change\s+(neg|pos)"[^>]*>([^<]+)</i);
   const change = changeMatch ? changeMatch[2].trim() : "";
@@ -49,6 +105,9 @@ function parseReport(filename, html) {
     changeDir,
     riskScore: parseInt(riskScoreRaw, 10) || 0,
     verdict,
+    signal,
+    gaugeNumColor: extractGaugeNumColorToken(html),
+    verdictColor: extractVerdictBarColorToken(html),
     file: `reports/${filename}`,
   };
 }
