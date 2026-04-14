@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TSLA Risk Score Report — April 2026</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#08090d;--surface:#0e1017;--surface2:#141720;--surface3:#1a1e2a;
+    --border:#1e2330;--border-light:#2a3040;
+    --text:#e8eaf0;--text-dim:#8890a4;--text-muted:#565e74;
+    --green:#00e676;--green-dim:#00e67620;--green-bg:#0a2618;
+    --red:#ff5252;--red-dim:#ff525220;--red-bg:#2a0e0e;
+    --amber:#ffab40;--amber-dim:#ffab4020;--amber-bg:#2a1e0a;
+    --blue:#448aff;--blue-dim:#448aff20;
+    --cyan:#18ffff;
+    --mono:'JetBrains Mono',monospace;
+    --sans:'DM Sans',sans-serif;
+    --page-w:1080px;
+  }
+  html{font-size:14px}
+  body{background:var(--bg);color:var(--text);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
+
+  /* PAGE WRAPPER */
+  .page{max-width:var(--page-w);margin:0 auto;padding:48px 40px;min-height:100vh;position:relative}
+  .page+.page{border-top:1px solid var(--border)}
+  .page::before{content:'';position:absolute;top:0;left:0;right:0;height:260px;background:linear-gradient(180deg,#448aff08 0%,transparent 100%);pointer-events:none}
+
+  /* PAGE BREAK for print */
+  @media print{.page{page-break-before:always;padding:24px}}
+
+  /* STOCK BAR */
+  .stock-bar{display:flex;align-items:center;gap:20px;padding:16px 24px;background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:32px;position:relative;overflow:hidden}
+  .stock-bar::after{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--blue),transparent)}
+  .stock-bar .ticker{font-family:var(--mono);font-size:1.7rem;font-weight:700;letter-spacing:-.02em;color:var(--text)}
+  .stock-bar .company{font-size:.95rem;color:var(--text-dim);margin-left:-8px}
+  .stock-bar .price-block{margin-left:auto;text-align:right}
+  .stock-bar .price{font-family:var(--mono);font-size:1.6rem;font-weight:600}
+  .stock-bar .change{font-family:var(--mono);font-size:.85rem;padding:3px 10px;border-radius:6px;display:inline-block;margin-top:2px}
+  .stock-bar .change.neg{color:var(--red);background:var(--red-dim)}
+  .stock-bar .change.pos{color:var(--green);background:var(--green-dim)}
+  .stock-bar .meta{font-family:var(--mono);font-size:.75rem;color:var(--text-muted);display:flex;flex-direction:column;gap:2px;min-width:140px}
+  .stock-bar .dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);animation:pulse 2s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+  /* GAUGE + SCORE */
+  .gauge-row{display:flex;align-items:center;gap:40px;margin-bottom:36px}
+  .gauge-wrap{width:220px;flex-shrink:0;position:relative}
+  .gauge-wrap svg{width:100%;display:block}
+  .gauge-label{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);text-align:center}
+  .gauge-label .num{font-family:var(--mono);font-size:2.8rem;font-weight:700;line-height:1;color:var(--amber)}
+  .gauge-label .sub{font-size:.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.12em;margin-top:2px}
+  .score-desc{flex:1}
+  .score-desc h2{font-size:1.1rem;font-weight:600;margin-bottom:6px;color:var(--amber)}
+  .score-desc p{font-size:.88rem;color:var(--text-dim);line-height:1.6;max-width:520px}
+
+  /* KPI STRIP */
+  .kpi-strip{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:36px}
+  .kpi{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;position:relative;overflow:hidden}
+  .kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+  .kpi.g::before{background:var(--green)}.kpi.r::before{background:var(--red)}.kpi.a::before{background:var(--amber)}.kpi.b::before{background:var(--blue)}
+  .kpi .label{font-size:.65rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);margin-bottom:6px}
+  .kpi .val{font-family:var(--mono);font-size:1.15rem;font-weight:600}
+  .kpi .sub{font-family:var(--mono);font-size:.7rem;color:var(--text-muted);margin-top:2px}
+
+  /* SVG CHART */
+  .chart-section{margin-bottom:36px}
+  .chart-section h3{font-size:.75rem;text-transform:uppercase;letter-spacing:.12em;color:var(--text-muted);margin-bottom:12px}
+  .chart-box{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px 24px 16px;position:relative;overflow:hidden}
+  .chart-box svg{width:100%;display:block}
+
+  /* CARD GRID */
+  .card-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:36px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px 20px;position:relative;overflow:hidden}
+  .card::before{content:'';position:absolute;top:0;left:0;width:3px;height:100%;border-radius:0 3px 3px 0}
+  .card.green::before{background:var(--green)}.card.red::before{background:var(--red)}.card.amber::before{background:var(--amber)}
+  .card .card-title{font-size:.7rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);margin-bottom:10px;display:flex;align-items:center;gap:8px}
+  .card .card-title .dot-ind{width:6px;height:6px;border-radius:50%}
+  .card.green .dot-ind{background:var(--green)}.card.red .dot-ind{background:var(--red)}.card.amber .dot-ind{background:var(--amber)}
+  .card ul{list-style:none;padding:0}
+  .card li{font-size:.82rem;color:var(--text-dim);padding:4px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+  .card li:last-child{border:none}
+  .card li .v{font-family:var(--mono);font-weight:500;font-size:.8rem}
+  .card li .v.g{color:var(--green)}.card li .v.r{color:var(--red)}.card li .v.a{color:var(--amber)}
+
+  /* SCORE BREAKDOWN */
+  .breakdown{margin-bottom:16px}
+  .breakdown h3{font-size:.75rem;text-transform:uppercase;letter-spacing:.12em;color:var(--text-muted);margin-bottom:14px}
+  .bar-row{display:flex;align-items:center;gap:14px;margin-bottom:10px}
+  .bar-row .bar-label{font-size:.8rem;color:var(--text-dim);width:140px;flex-shrink:0}
+  .bar-row .bar-track{flex:1;height:10px;background:var(--surface2);border-radius:5px;overflow:hidden;position:relative}
+  .bar-row .bar-fill{height:100%;border-radius:5px;position:relative}
+  .bar-row .bar-fill::after{content:'';position:absolute;top:0;right:0;bottom:0;width:40%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.12))}
+  .bar-row .bar-num{font-family:var(--mono);font-size:.8rem;font-weight:600;width:60px;text-align:right;flex-shrink:0}
+
+  /* PAGE 2 */
+  /* QUARTERLY TABLE */
+  .qtable{width:100%;border-collapse:collapse;margin-bottom:36px;font-size:.82rem}
+  .qtable th{font-size:.65rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);font-weight:500;padding:10px 12px;text-align:right;border-bottom:1px solid var(--border-light)}
+  .qtable th:first-child{text-align:left}
+  .qtable td{font-family:var(--mono);font-weight:400;padding:10px 12px;text-align:right;border-bottom:1px solid var(--border);color:var(--text-dim)}
+  .qtable td:first-child{font-family:var(--sans);color:var(--text);text-align:left;font-weight:500}
+  .qtable tr:hover td{background:var(--surface)}
+  .qtable .highlight td{background:var(--surface2);color:var(--text)}
+
+  /* DUAL COLUMN */
+  .dual{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:36px}
+  .dual-col{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px 22px}
+  .dual-col h4{font-size:.7rem;text-transform:uppercase;letter-spacing:.12em;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+  .dual-col h4 .ic{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.65rem}
+  .dual-col.catalysts h4{color:var(--green)}.dual-col.catalysts h4 .ic{background:var(--green-dim);color:var(--green)}
+  .dual-col.risks h4{color:var(--red)}.dual-col.risks h4 .ic{background:var(--red-dim);color:var(--red)}
+  .dual-col li{font-size:.82rem;color:var(--text-dim);padding:6px 0;border-bottom:1px solid var(--border);line-height:1.5}
+  .dual-col li:last-child{border:none}
+  .dual-col ul{list-style:none;padding:0}
+
+  /* EARNINGS BOX */
+  .earnings-box{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px 24px;margin-bottom:36px}
+  .earnings-box h4{font-size:.7rem;text-transform:uppercase;letter-spacing:.12em;color:var(--text-muted);margin-bottom:10px}
+  .earnings-box p{font-size:.88rem;color:var(--text-dim);line-height:1.65}
+  .earnings-box .highlight-date{font-family:var(--mono);color:var(--cyan);font-weight:500}
+
+  /* BOTTOM LINE */
+  .bottom-line{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px 28px;position:relative;overflow:hidden}
+  .bottom-line::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--red),var(--amber),var(--green))}
+  .bottom-line h3{font-size:.95rem;font-weight:600;margin-bottom:8px;color:var(--text)}
+  .bottom-line p{font-size:.88rem;color:var(--text-dim);line-height:1.65;margin-bottom:16px}
+  .rating-bar{display:flex;align-items:center;gap:16px;margin-top:14px}
+  .rating-bar .segments{display:flex;gap:3px;flex:1}
+  .rating-bar .seg{height:8px;flex:1;border-radius:4px;background:var(--surface2)}
+  .rating-bar .seg.active-r{background:var(--red)}.rating-bar .seg.active-a{background:var(--amber)}.rating-bar .seg.active-g{background:var(--green)}
+  .rating-bar .verdict{font-family:var(--mono);font-size:.95rem;font-weight:700;color:var(--amber);white-space:nowrap}
+  .rating-labels{display:flex;justify-content:space-between;margin-top:6px;font-size:.6rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted)}
+
+  /* COPY BTN */
+  .copy-btn{position:fixed;bottom:24px;right:24px;background:var(--surface2);border:1px solid var(--border-light);color:var(--text-dim);font-family:var(--mono);font-size:.75rem;padding:10px 18px;border-radius:8px;cursor:pointer;z-index:100;transition:all .2s}
+  .copy-btn:hover{background:var(--blue);color:#fff;border-color:var(--blue)}
+
+  /* SECTION TITLES */
+  .section-title{font-size:.75rem;text-transform:uppercase;letter-spacing:.12em;color:var(--text-muted);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+
+  /* FOOTER */
+  .report-footer{text-align:center;padding:20px 0 0;font-size:.65rem;color:var(--text-muted);border-top:1px solid var(--border);margin-top:32px}
+
+  /* RESPONSIVE */
+  @media(max-width:800px){
+    .kpi-strip{grid-template-columns:repeat(3,1fr)}
+    .card-grid{grid-template-columns:1fr}
+    .dual{grid-template-columns:1fr}
+    .stock-bar{flex-wrap:wrap}
+    .gauge-row{flex-direction:column;align-items:flex-start}
+  }
+</style>
+</head>
+<body>
+
+<!-- ========== PAGE 1 ========== -->
+<div class="page" id="page1">
+
+  <!-- TIMESTAMP -->
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+    <span style="font-family:var(--mono);font-size:.7rem;color:var(--text-muted);letter-spacing:.06em">RISK SCORE REPORT</span>
+    <span style="font-family:var(--mono);font-size:.7rem;color:var(--text-muted);letter-spacing:.04em" id="analysis-ts">April 14, 2026 — 13:42 CET</span>
+  </div>
+
+  <!-- STOCK BAR -->
+  <div class="stock-bar">
+    <div class="dot"></div>
+    <div>
+      <div class="ticker">TSLA</div>
+      <div class="company">Tesla, Inc. &middot; NASDAQ</div>
+    </div>
+    <div class="meta">
+      <span>Mkt Cap <b style="color:var(--text)">$1.31T</b></span>
+      <span>52w <b style="color:var(--text)">$222.79 – $498.83</b></span>
+      <span>Vol <b style="color:var(--text)">53.6M</b></span>
+    </div>
+    <div class="price-block">
+      <div class="price">$352.42</div>
+      <div class="change neg">▼ 20.2% YTD</div>
+    </div>
+  </div>
+
+  <!-- GAUGE + SCORE -->
+  <div class="gauge-row">
+    <div class="gauge-wrap">
+      <svg viewBox="0 0 200 120" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="gaugeBg" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#1a1e2a"/>
+            <stop offset="100%" stop-color="#1a1e2a"/>
+          </linearGradient>
+          <linearGradient id="gaugeGrad" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#00e676"/>
+            <stop offset="40%" stop-color="#ffab40"/>
+            <stop offset="100%" stop-color="#ff5252"/>
+          </linearGradient>
+        </defs>
+        <!-- Background arc -->
+        <path d="M 20 105 A 80 80 0 0 1 180 105" fill="none" stroke="url(#gaugeBg)" stroke-width="12" stroke-linecap="round"/>
+        <!-- Value arc: 66/100 -> 66% of 180deg -->
+        <path d="M 20 105 A 80 80 0 0 1 180 105" fill="none" stroke="url(#gaugeGrad)" stroke-width="12" stroke-linecap="round" stroke-dasharray="251" stroke-dashoffset="85" opacity=".9"/>
+        <!-- Tick marks -->
+        <text x="14" y="115" font-family="JetBrains Mono" font-size="8" fill="#565e74">0</text>
+        <text x="93" y="20" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">50</text>
+        <text x="178" y="115" font-family="JetBrains Mono" font-size="8" fill="#565e74">100</text>
+        <!-- Needle indicator at 66 -->
+        <circle cx="52" cy="40" r="4" fill="#ffab40" opacity=".9"/>
+      </svg>
+      <div class="gauge-label">
+        <div class="num">66</div>
+        <div class="sub">Risk Score</div>
+      </div>
+    </div>
+    <div class="score-desc">
+      <h2>Elevated Risk — Caution Warranted</h2>
+      <p>Tesla trades at extreme premium multiples (P/E ~325×) pricing in ambitious autonomy & robotics bets yet to materialize at scale, while core auto deliveries decline and competition intensifies. Strong balance sheet ($44B cash) and optionality from FSD/Robotaxi provide downside support, but 2026 is a prove-it year with $20B+ capex ahead.</p>
+    </div>
+  </div>
+
+  <!-- KPI STRIP -->
+  <div class="kpi-strip">
+    <div class="kpi a">
+      <div class="label">P/E Ratio</div>
+      <div class="val" style="color:var(--red)">324.5×</div>
+      <div class="sub">Fwd 174×</div>
+    </div>
+    <div class="kpi r">
+      <div class="label">FY25 Revenue</div>
+      <div class="val">$94.8B</div>
+      <div class="sub" style="color:var(--red)">-2.9% YoY</div>
+    </div>
+    <div class="kpi g">
+      <div class="label">Gross Margin</div>
+      <div class="val" style="color:var(--green)">20.1%</div>
+      <div class="sub">Q4 — 2yr high</div>
+    </div>
+    <div class="kpi r">
+      <div class="label">FY25 Deliveries</div>
+      <div class="val">1.636M</div>
+      <div class="sub" style="color:var(--red)">-8.6% YoY</div>
+    </div>
+    <div class="kpi g">
+      <div class="label">Cash + Inv.</div>
+      <div class="val" style="color:var(--green)">$44.1B</div>
+      <div class="sub">+21% YoY</div>
+    </div>
+    <div class="kpi b">
+      <div class="label">Next Earnings</div>
+      <div class="val" style="color:var(--cyan)">Apr 22</div>
+      <div class="sub">Q1 FY26</div>
+    </div>
+  </div>
+
+  <!-- 12-MONTH SVG PRICE CHART -->
+  <div class="chart-section">
+    <h3>12-Month Price Action &middot; TSLA</h3>
+    <div class="chart-box">
+      <svg viewBox="0 0 1000 300" xmlns="http://www.w3.org/2000/svg" style="overflow:visible">
+        <defs>
+          <linearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#448aff" stop-opacity=".18"/>
+            <stop offset="100%" stop-color="#448aff" stop-opacity="0"/>
+          </linearGradient>
+          <linearGradient id="lineGrad" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#448aff"/>
+            <stop offset="60%" stop-color="#ffab40"/>
+            <stop offset="100%" stop-color="#ff5252"/>
+          </linearGradient>
+        </defs>
+        <!-- Grid lines -->
+        <line x1="60" y1="20" x2="60" y2="260" stroke="#1e2330" stroke-width=".5"/>
+        <line x1="60" y1="260" x2="980" y2="260" stroke="#1e2330" stroke-width=".5"/>
+        <line x1="60" y1="65" x2="980" y2="65" stroke="#1e2330" stroke-width=".5" stroke-dasharray="4"/>
+        <line x1="60" y1="130" x2="980" y2="130" stroke="#1e2330" stroke-width=".5" stroke-dasharray="4"/>
+        <line x1="60" y1="195" x2="980" y2="195" stroke="#1e2330" stroke-width=".5" stroke-dasharray="4"/>
+        <!-- Y-axis labels -->
+        <text x="50" y="24" font-family="JetBrains Mono" font-size="9" fill="#565e74" text-anchor="end">$500</text>
+        <text x="50" y="69" font-family="JetBrains Mono" font-size="9" fill="#565e74" text-anchor="end">$440</text>
+        <text x="50" y="134" font-family="JetBrains Mono" font-size="9" fill="#565e74" text-anchor="end">$370</text>
+        <text x="50" y="199" font-family="JetBrains Mono" font-size="9" fill="#565e74" text-anchor="end">$300</text>
+        <text x="50" y="264" font-family="JetBrains Mono" font-size="9" fill="#565e74" text-anchor="end">$220</text>
+        <!-- X-axis: monthly labels Apr 25 → Apr 26 -->
+        <text x="80" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Apr</text>
+        <text x="155" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">May</text>
+        <text x="230" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Jun</text>
+        <text x="305" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Jul</text>
+        <text x="380" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Aug</text>
+        <text x="455" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Sep</text>
+        <text x="530" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Oct</text>
+        <text x="605" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Nov</text>
+        <text x="680" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Dec</text>
+        <text x="755" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Jan</text>
+        <text x="830" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Feb</text>
+        <text x="905" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Mar</text>
+        <text x="960" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Apr</text>
+        <!--
+          Price points (approx monthly close):
+          Apr 25: ~$250  May: ~$348  Jun: ~$340  Jul: ~$290  Aug: ~$225  Sep: ~$260
+          Oct: ~$270  Nov: ~$350  Dec: ~$490 (ATH)  Jan 26: ~$400  Feb: ~$370  Mar: ~$360  Apr 14: ~$352
+          Y-scale: $220=260, $500=20 → scale factor: (500-price)/(500-220)*240 + 20
+        -->
+        <!-- Area fill -->
+        <path d="M 80,222 L 155,138 230,143 305,181 380,238 455,208 530,199 605,138 680,24 755,86 830,112 905,121 960,128 L 960,260 80,260 Z" fill="url(#chartFill)"/>
+        <!-- Line -->
+        <polyline points="80,222 155,138 230,143 305,181 380,238 455,208 530,199 605,138 680,24 755,86 830,112 905,121 960,128" fill="none" stroke="url(#lineGrad)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+        <!-- Data dots -->
+        <circle cx="80" cy="222" r="3" fill="#448aff"/>
+        <circle cx="680" cy="24" r="4" fill="#00e676" stroke="#08090d" stroke-width="2"/>
+        <circle cx="960" cy="128" r="4" fill="#ff5252" stroke="#08090d" stroke-width="2"/>
+
+        <!-- ANNOTATIONS -->
+        <!-- ATH Dec -->
+        <line x1="680" y1="24" x2="680" y2="50" stroke="#00e676" stroke-width=".8" stroke-dasharray="3"/>
+        <rect x="640" y="2" width="80" height="18" rx="4" fill="#0a2618" stroke="#00e676" stroke-width=".5"/>
+        <text x="680" y="14" font-family="JetBrains Mono" font-size="8" fill="#00e676" text-anchor="middle">ATH $498.83</text>
+
+        <!-- Q4 Earnings Jan 28 -->
+        <line x1="755" y1="86" x2="755" y2="72" stroke="#ffab40" stroke-width=".8" stroke-dasharray="3"/>
+        <rect x="706" y="56" width="98" height="16" rx="4" fill="#2a1e0a" stroke="#ffab40" stroke-width=".5"/>
+        <text x="755" y="67" font-family="JetBrains Mono" font-size="7.5" fill="#ffab40" text-anchor="middle">Q4 Earnings Beat</text>
+
+        <!-- Aug 52w low area -->
+        <line x1="380" y1="238" x2="380" y2="250" stroke="#ff5252" stroke-width=".8" stroke-dasharray="3"/>
+        <rect x="340" y="244" width="80" height="16" rx="4" fill="#2a0e0e" stroke="#ff5252" stroke-width=".5"/>
+        <text x="380" y="255" font-family="JetBrains Mono" font-size="7.5" fill="#ff5252" text-anchor="middle">52w Low $222</text>
+
+        <!-- Q1 Delivery Miss Apr 2 -->
+        <line x1="940" y1="128" x2="940" y2="108" stroke="#ff5252" stroke-width=".8" stroke-dasharray="3"/>
+        <rect x="880" y="93" width="100" height="16" rx="4" fill="#2a0e0e" stroke="#ff5252" stroke-width=".5"/>
+        <text x="935" y="104" font-family="JetBrains Mono" font-size="7.5" fill="#ff5252" text-anchor="middle">Q1 Delivery Miss</text>
+      </svg>
+    </div>
+  </div>
+
+  <!-- 6-CARD GRID -->
+  <div class="section-title">Fundamental Scorecard</div>
+  <div class="card-grid">
+    <!-- VALUATION -->
+    <div class="card red">
+      <div class="card-title"><span class="dot-ind"></span>Valuation</div>
+      <ul>
+        <li>Trailing P/E<span class="v r">324.5×</span></li>
+        <li>Forward P/E<span class="v r">174×</span></li>
+        <li>EV / Revenue<span class="v r">13.8×</span></li>
+        <li>EV / EBITDA<span class="v r">138×</span></li>
+        <li>Price / FCF<span class="v a">211×</span></li>
+      </ul>
+    </div>
+    <div class="card green">
+      <div class="card-title"><span class="dot-ind"></span>Financial Health</div>
+      <ul>
+        <li>Cash + Inv.<span class="v g">$44.1B</span></li>
+        <li>Total Debt<span class="v g">$6.6B</span></li>
+        <li>Net Cash<span class="v g">+$37.5B</span></li>
+        <li>Current Ratio<span class="v g">1.84</span></li>
+        <li>Debt / Equity<span class="v g">0.07</span></li>
+      </ul>
+    </div>
+    <div class="card red">
+      <div class="card-title"><span class="dot-ind"></span>Growth</div>
+      <ul>
+        <li>Rev Growth (FY25)<span class="v r">-2.9%</span></li>
+        <li>EPS Growth (FY25)<span class="v r">-46.5%</span></li>
+        <li>Delivery Growth<span class="v r">-8.6%</span></li>
+        <li>Energy Rev Growth<span class="v g">+22%</span></li>
+        <li>Q1'26 Del. YoY<span class="v g">+6.3%</span></li>
+      </ul>
+    </div>
+
+    <div class="card amber">
+      <div class="card-title"><span class="dot-ind"></span>Profitability</div>
+      <ul>
+        <li>Gross Margin (Q4)<span class="v g">20.1%</span></li>
+        <li>Auto Margin ex-Cr<span class="v a">17.9%</span></li>
+        <li>Operating Margin<span class="v r">5.8%</span></li>
+        <li>Net Margin (FY25)<span class="v r">4.0%</span></li>
+        <li>EBITDA Margin<span class="v a">15.0%</span></li>
+      </ul>
+    </div>
+    <div class="card amber">
+      <div class="card-title"><span class="dot-ind"></span>Cash Flow</div>
+      <ul>
+        <li>Op. Cash Flow<span class="v g">$14.7B</span></li>
+        <li>Free Cash Flow<span class="v a">$6.2B</span></li>
+        <li>CapEx (FY25)<span class="v a">$9.0B</span></li>
+        <li>Planned CapEx '26<span class="v r">>$20B</span></li>
+        <li>FCF Yield<span class="v r">0.47%</span></li>
+      </ul>
+    </div>
+    <div class="card red">
+      <div class="card-title"><span class="dot-ind"></span>Demand & Competition</div>
+      <ul>
+        <li>Q1'26 vs Consensus<span class="v r">-7,622</span></li>
+        <li>Prod-Del Gap Q1<span class="v r">+50,363</span></li>
+        <li>Europe Sales YoY<span class="v r">-49%</span></li>
+        <li>BYD BEV (FY25)<span class="v r">2.26M</span></li>
+        <li>FSD Adoption<span class="v a">~12%</span></li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- SCORE BREAKDOWN -->
+  <div class="breakdown">
+    <h3>Score Breakdown &middot; Weighted Components</h3>
+    <div class="bar-row">
+      <div class="bar-label">Valuation <span style="color:var(--text-muted);font-size:.7rem">(35%)</span></div>
+      <div class="bar-track">
+        <div class="bar-fill" style="width:80%;background:linear-gradient(90deg,var(--red),#ff8a65)"></div>
+      </div>
+      <div class="bar-num" style="color:var(--red)">28 / 35</div>
+    </div>
+    <div class="bar-row">
+      <div class="bar-label">Financial Health <span style="color:var(--text-muted);font-size:.7rem">(35%)</span></div>
+      <div class="bar-track">
+        <div class="bar-fill" style="width:51%;background:linear-gradient(90deg,var(--green),#69f0ae)"></div>
+      </div>
+      <div class="bar-num" style="color:var(--green)">18 / 35</div>
+    </div>
+    <div class="bar-row">
+      <div class="bar-label">Growth <span style="color:var(--text-muted);font-size:.7rem">(30%)</span></div>
+      <div class="bar-track">
+        <div class="bar-fill" style="width:67%;background:linear-gradient(90deg,var(--amber),#ffd54f)"></div>
+      </div>
+      <div class="bar-num" style="color:var(--amber)">20 / 30</div>
+    </div>
+    <div style="text-align:right;font-family:var(--mono);font-size:.85rem;color:var(--text);margin-top:8px;padding-right:0">
+      Composite Score: <span style="color:var(--amber);font-weight:700;font-size:1rem">66 / 100</span>
+      <span style="color:var(--text-muted);font-size:.72rem;margin-left:8px">Higher = Higher Risk</span>
+    </div>
+  </div>
+
+  <div class="report-footer">
+    Report generated April 14, 2026 &middot; Data sources: SEC filings, Tesla IR, analyst consensus &middot; Not investment advice
+  </div>
+</div>
+
+<!-- ========== PAGE 2 ========== -->
+<div class="page" id="page2">
+
+  <div style="display:flex;align-items:baseline;gap:16px;margin-bottom:28px">
+    <span style="font-family:var(--mono);font-size:1.3rem;font-weight:700">TSLA</span>
+    <span style="font-size:.85rem;color:var(--text-dim)">Risk Report — Page 2 of 2</span>
+    <span style="margin-left:auto;font-family:var(--mono);font-size:.75rem;color:var(--text-muted)">14 APR 2026 · 13:42 CET</span>
+  </div>
+
+  <!-- QUARTERLY TREND TABLE -->
+  <div class="section-title">Quarterly Financial Trends</div>
+  <table class="qtable">
+    <thead>
+      <tr>
+        <th>Metric</th>
+        <th>Q1 '25</th>
+        <th>Q2 '25</th>
+        <th>Q3 '25</th>
+        <th>Q4 '25</th>
+        <th style="color:var(--cyan)">Q1 '26 (Est.)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Revenue ($B)</td>
+        <td>19.34</td>
+        <td>22.50</td>
+        <td>28.10</td>
+        <td>24.90</td>
+        <td style="color:var(--text-muted)">~21.5</td>
+      </tr>
+      <tr>
+        <td>Gross Margin</td>
+        <td>16.3%</td>
+        <td>17.2%</td>
+        <td>18.0%</td>
+        <td style="color:var(--green)">20.1%</td>
+        <td style="color:var(--text-muted)">~17.0%</td>
+      </tr>
+      <tr>
+        <td>Operating Margin</td>
+        <td style="color:var(--red)">2.1%</td>
+        <td>4.1%</td>
+        <td>5.8%</td>
+        <td>6.2%</td>
+        <td style="color:var(--text-muted)">~3.5%</td>
+      </tr>
+      <tr>
+        <td>EPS (non-GAAP)</td>
+        <td>$0.27</td>
+        <td>$0.40</td>
+        <td>$0.50</td>
+        <td>$0.50</td>
+        <td style="color:var(--text-muted)">~$0.38</td>
+      </tr>
+      <tr>
+        <td>Deliveries (K)</td>
+        <td>336.7</td>
+        <td>443.9</td>
+        <td>497.1</td>
+        <td>418.2</td>
+        <td style="color:var(--red)">358.0</td>
+      </tr>
+      <tr>
+        <td>Energy Storage (GWh)</td>
+        <td>10.4</td>
+        <td>9.4</td>
+        <td>12.5</td>
+        <td style="color:var(--green)">14.2</td>
+        <td style="color:var(--red)">8.8</td>
+      </tr>
+      <tr>
+        <td>Free Cash Flow ($B)</td>
+        <td style="color:var(--red)">0.66</td>
+        <td style="color:var(--red)">0.15</td>
+        <td style="color:var(--green)">3.99</td>
+        <td>1.42</td>
+        <td style="color:var(--text-muted)">TBD</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- LATEST EARNINGS / DELIVERY UPDATE -->
+  <div class="earnings-box">
+    <h4>Latest Update — Q1 2026 Delivery & Upcoming Earnings</h4>
+    <p>
+      Tesla delivered <strong>358,023 vehicles</strong> in Q1 2026, missing consensus of 365,645 by ~7,600 units. Production hit 408,386 — creating a <strong style="color:var(--red)">50,363-unit inventory overhang</strong>, the largest production-delivery gap in Tesla's history. Energy storage deployments collapsed to 8.8 GWh, missing the 14.4 GWh estimate by 39%. Europe sales plunged ~49% YoY amid competition and brand headwinds. The Netherlands approved FSD supervised driving on April 13, a potential catalyst for broader EU expansion. Full Q1 financial results drop <span class="highlight-date">April 22, 2026</span> — focus will be on margins, FSD monetization, Cybercab production timeline, and updated capex guidance.
+    </p>
+  </div>
+
+  <!-- CATALYSTS VS RISKS -->
+  <div class="dual">
+    <div class="dual-col catalysts">
+      <h4><span class="ic">▲</span> Catalysts</h4>
+      <ul>
+        <li><strong>Q1 Earnings Apr 22</strong> — potential margin surprise and FSD revenue update could reset narrative</li>
+        <li><strong>Cybercab production ramp</strong> — volume production at Giga Texas starting this month, first dedicated robotaxi platform</li>
+        <li><strong>FSD Europe approval</strong> — Netherlands greenlight opens door to broader EU rollout, new TAM</li>
+        <li><strong>Robotaxi expansion</strong> — Austin service live, expansion to Houston/Bay Area expected 2026</li>
+        <li><strong>10B FSD miles</strong> — approaching data moat milestone for autonomous driving confidence</li>
+        <li><strong>Cheaper EV model</strong> — reported sub-$30K smaller SUV in development for mass market</li>
+        <li><strong>Energy supercycle</strong> — Houston Megafactory opening, global grid storage demand surge</li>
+      </ul>
+    </div>
+    <div class="dual-col risks">
+      <h4><span class="ic">▼</span> Risks</h4>
+      <ul>
+        <li><strong>Demand destruction</strong> — 50K+ inventory gap, Europe -49%, brand damage from Musk's political activities</li>
+        <li><strong>Massive capex burn</strong> — $20B+ planned 2026 spend, negative FCF likely; possible cap raise discussions with banks</li>
+        <li><strong>BYD dominance</strong> — surpassed Tesla in BEV volume (2.26M units), profitable at $10K price points Tesla can't match</li>
+        <li><strong>Valuation compression</strong> — at 325× P/E, any FSD/robotaxi delay forces sharp multiple contraction</li>
+        <li><strong>SpaceX IPO drain</strong> — rumored ~$2T IPO could siphon capital from TSLA holders into SpaceX</li>
+        <li><strong>Tariff & geopolitical</strong> — $500M+ Q4 tariff impact, China battery supply risk, Hormuz oil disruption</li>
+        <li><strong>Energy margin pressure</strong> — higher tariffs on Chinese LFP cells, intensifying competition in storage</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- BOTTOM LINE -->
+  <div class="bottom-line">
+    <h3>Bottom Line</h3>
+    <p>
+      Tesla is a binary stock in 2026. The bull case — robotaxi scale, FSD monetization, Cybercab ramp, energy dominance — could justify today's $1.3T cap and more. The bear case — continued delivery declines, margin erosion from competition, $20B+ capex with negative FCF, and autonomy delays — makes the current valuation indefensible on fundamentals. Q1 deliveries already missed. April 22 earnings will be pivotal. The risk/reward skew is unfavorable for new positions at these multiples, but the fortress balance sheet and optionality keep the floor relatively firm.
+    </p>
+    <div class="rating-bar">
+      <div class="segments">
+        <div class="seg active-r"></div>
+        <div class="seg active-r"></div>
+        <div class="seg active-r"></div>
+        <div class="seg active-a"></div>
+        <div class="seg active-a"></div>
+        <div class="seg active-a"></div>
+        <div class="seg active-a"></div>
+        <div class="seg"></div>
+        <div class="seg"></div>
+        <div class="seg"></div>
+      </div>
+      <div class="verdict">HOLD — HIGH RISK</div>
+    </div>
+    <div class="rating-labels">
+      <span>Strong Buy</span>
+      <span>Buy</span>
+      <span>Hold</span>
+      <span>Sell</span>
+      <span>Strong Sell</span>
+    </div>
+  </div>
+
+  <div class="report-footer">
+    Report generated April 14, 2026 &middot; Sources: Tesla IR, SEC EDGAR, analyst consensus &middot; Not investment advice &middot; Past performance ≠ future results
+  </div>
+</div>
+
+<!-- CLIPBOARD EXPORT -->
+<button class="copy-btn" onclick="copyReport()">📋 Copy to Clipboard</button>
+
+<script>
+function copyReport(){
+  const el = document.body;
+  const text = [];
+  // Build plain-text version
+  text.push('TSLA RISK SCORE REPORT — April 14, 2026 · 13:42 CET');
+  text.push('═'.repeat(50));
+  text.push('Price: $352.42 | YTD: -20.2% | Mkt Cap: $1.31T');
+  text.push('52-Week: $222.79 – $498.83 | P/E: 324.5×');
+  text.push('');
+  text.push('RISK SCORE: 66/100 — Elevated Risk');
+  text.push('  Valuation:  28/35 (High Risk)');
+  text.push('  Fin Health:  18/35 (Low Risk)');
+  text.push('  Growth:     20/30 (Moderate Risk)');
+  text.push('');
+  text.push('KEY METRICS');
+  text.push('  FY25 Revenue: $94.8B (-2.9%)');
+  text.push('  FY25 Net Income: $3.8B (-46.5%)');
+  text.push('  Gross Margin Q4: 20.1% (2yr high)');
+  text.push('  Cash: $44.1B | Debt: $6.6B');
+  text.push('  FY25 Deliveries: 1.636M (-8.6%)');
+  text.push('  Q1 26 Deliveries: 358K (miss by 7.6K)');
+  text.push('');
+  text.push('VERDICT: HOLD — HIGH RISK');
+  text.push('Next earnings: April 22, 2026');
+  text.push('');
+  text.push('Not investment advice.');
+
+  navigator.clipboard.writeText(text.join('\n')).then(()=>{
+    const btn = document.querySelector('.copy-btn');
+    btn.textContent = '✓ Copied!';
+    btn.style.background = '#00e676';
+    btn.style.color = '#08090d';
+    btn.style.borderColor = '#00e676';
+    setTimeout(()=>{
+      btn.textContent = '📋 Copy to Clipboard';
+      btn.style.background = '';
+      btn.style.color = '';
+      btn.style.borderColor = '';
+    }, 2000);
+  });
+}
+</script>
+
+</body>
+</html>

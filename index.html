@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ticker Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#08090d;--surface:#0e1017;--surface2:#141720;--surface3:#1a1e2a;
+  --border:#1e2330;--border-light:#2a3040;
+  --text:#e8eaf0;--text-dim:#8890a4;--text-muted:#565e74;
+  --green:#00e676;--green-dim:#00e67620;--green-bg:#0a2618;
+  --red:#ff5252;--red-dim:#ff525220;--red-bg:#2a0e0e;
+  --amber:#ffab40;--amber-dim:#ffab4020;--amber-bg:#2a1e0a;
+  --blue:#448aff;--blue-dim:#448aff20;
+  --cyan:#18ffff;
+  --mono:'JetBrains Mono',monospace;
+  --sans:'DM Sans',sans-serif;
+}
+html{font-size:14px}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased;min-height:100vh}
+
+.container{max-width:1200px;margin:0 auto;padding:48px 32px}
+
+/* HEADER */
+header{margin-bottom:40px;position:relative}
+header::after{content:'';position:absolute;bottom:-16px;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--border-light),transparent)}
+.logo{display:flex;align-items:center;gap:14px;margin-bottom:8px}
+.logo h1{font-family:var(--mono);font-size:1.5rem;font-weight:700;letter-spacing:-.03em}
+.logo h1 span{color:var(--blue)}
+.subtitle{font-size:.85rem;color:var(--text-muted)}
+
+/* FILTERS */
+.filters{display:flex;gap:12px;margin-bottom:32px;flex-wrap:wrap;align-items:center}
+.filter-input{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 16px;color:var(--text);font-family:var(--mono);font-size:.82rem;outline:none;transition:border-color .2s}
+.filter-input:focus{border-color:var(--blue)}
+.filter-input::placeholder{color:var(--text-muted)}
+input.filter-input{width:220px}
+select.filter-input{cursor:pointer;-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23565e74' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:36px}
+.filter-count{margin-left:auto;font-family:var(--mono);font-size:.75rem;color:var(--text-muted)}
+
+/* TILE GRID */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px}
+
+/* TILE */
+.tile{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:22px 24px;cursor:pointer;transition:all .2s ease;position:relative;overflow:hidden;text-decoration:none;color:inherit;display:block}
+.tile:hover{border-color:var(--border-light);transform:translateY(-2px);box-shadow:0 8px 32px rgba(0,0,0,.3)}
+.tile::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--blue),transparent);opacity:0;transition:opacity .2s}
+.tile:hover::before{opacity:1}
+
+.tile-header{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+.tile-ticker{font-family:var(--mono);font-size:1.3rem;font-weight:700;letter-spacing:-.02em}
+.tile-company{font-size:.78rem;color:var(--text-muted);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile-date{font-family:var(--mono);font-size:.7rem;color:var(--text-muted);white-space:nowrap}
+
+.tile-body{display:flex;align-items:center;gap:20px}
+
+.tile-gauge{width:72px;height:72px;flex-shrink:0;position:relative;display:flex;align-items:center;justify-content:center}
+.tile-gauge svg{position:absolute;inset:0;width:100%;height:100%}
+.tile-gauge .gauge-val{font-family:var(--mono);font-size:1.2rem;font-weight:700;position:relative;z-index:1}
+.tile-gauge .gauge-label{font-size:.5rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);position:absolute;bottom:4px;left:50%;transform:translateX(-50%);white-space:nowrap;z-index:1}
+
+.tile-metrics{flex:1;display:flex;flex-direction:column;gap:8px}
+.tile-row{display:flex;justify-content:space-between;align-items:center}
+.tile-row .label{font-size:.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}
+.tile-row .value{font-family:var(--mono);font-size:.85rem;font-weight:500}
+.tile-row .value.neg{color:var(--red)}
+.tile-row .value.pos{color:var(--green)}
+
+.tile-verdict{margin-top:14px;padding-top:12px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.verdict-dots{display:flex;gap:2px}
+.verdict-dot{width:6px;height:6px;border-radius:50%;background:var(--surface2)}
+.verdict-dot.r{background:var(--red)}.verdict-dot.a{background:var(--amber)}.verdict-dot.g{background:var(--green)}
+.verdict-text{font-family:var(--mono);font-size:.72rem;font-weight:600;letter-spacing:.04em}
+
+/* EMPTY STATE */
+.empty{grid-column:1/-1;text-align:center;padding:80px 20px}
+.empty-icon{font-size:2.5rem;margin-bottom:16px;opacity:.3}
+.empty h3{font-size:1rem;color:var(--text-dim);margin-bottom:6px}
+.empty p{font-size:.85rem;color:var(--text-muted)}
+
+/* FOOTER */
+footer{text-align:center;padding:40px 0 0;font-size:.65rem;color:var(--text-muted);border-top:1px solid var(--border);margin-top:48px}
+
+@media(max-width:600px){
+  .container{padding:24px 16px}
+  .grid{grid-template-columns:1fr}
+  .filters{flex-direction:column;align-items:stretch}
+  input.filter-input{width:100%}
+  .filter-count{margin-left:0;margin-top:4px}
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <div class="logo">
+      <h1><span>&#9632;</span> Ticker Tracker</h1>
+    </div>
+    <p class="subtitle">Stock risk analysis reports</p>
+  </header>
+
+  <div class="filters">
+    <input type="text" class="filter-input" id="tickerFilter" placeholder="Search ticker..." autocomplete="off" spellcheck="false">
+    <select class="filter-input" id="dateFilter">
+      <option value="all">All dates</option>
+      <option value="7">Last 7 days</option>
+      <option value="30">Last 30 days</option>
+      <option value="90">Last 90 days</option>
+    </select>
+    <span class="filter-count" id="countLabel"></span>
+  </div>
+
+  <div class="grid" id="grid"></div>
+
+  <footer>
+    Ticker Tracker &middot; Not investment advice &middot; Reports are point-in-time snapshots
+  </footer>
+</div>
+
+<script>
+let allReports = [];
+
+function riskColor(score) {
+  if (score <= 35) return "var(--green)";
+  if (score <= 65) return "var(--amber)";
+  return "var(--red)";
+}
+
+function verdictDots(score) {
+  const filled = Math.round(score / 10);
+  let html = "";
+  for (let i = 0; i < 10; i++) {
+    let cls = "";
+    if (i < filled) {
+      if (i < 4) cls = "r";
+      else if (i < 7) cls = "a";
+      else cls = "g";
+    }
+    html += `<span class="verdict-dot ${cls}"></span>`;
+  }
+  return html;
+}
+
+function gaugeArc(score) {
+  const radius = 28;
+  const circumference = Math.PI * radius;
+  const pct = score / 100;
+  const dashoffset = circumference * (1 - pct);
+  const color = riskColor(score);
+
+  return `<svg viewBox="0 0 72 72">
+    <circle cx="36" cy="36" r="${radius}" fill="none" stroke="var(--surface2)" stroke-width="5"
+      stroke-dasharray="${circumference}" stroke-dashoffset="${circumference / 2}"
+      transform="rotate(180 36 36)" stroke-linecap="round"/>
+    <circle cx="36" cy="36" r="${radius}" fill="none" stroke="${color}" stroke-width="5"
+      stroke-dasharray="${circumference}" stroke-dashoffset="${circumference / 2 + dashoffset}"
+      transform="rotate(180 36 36)" stroke-linecap="round" opacity=".85"/>
+  </svg>`;
+}
+
+function formatDate(dateStr) {
+  const d = new Date(dateStr + "T00:00:00");
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function renderTile(r) {
+  const color = riskColor(r.riskScore);
+  const changeClass = r.changeDir === "pos" ? "pos" : "neg";
+
+  return `<a class="tile" href="${r.file}" data-ticker="${r.ticker}" data-date="${r.date}">
+    <div class="tile-header">
+      <span class="tile-ticker">${r.ticker}</span>
+      <span class="tile-company">${r.company}</span>
+      <span class="tile-date">${formatDate(r.date)} ${r.time}</span>
+    </div>
+    <div class="tile-body">
+      <div class="tile-gauge">
+        ${gaugeArc(r.riskScore)}
+        <span class="gauge-val" style="color:${color}">${r.riskScore}</span>
+        <span class="gauge-label">Risk</span>
+      </div>
+      <div class="tile-metrics">
+        <div class="tile-row">
+          <span class="label">Price</span>
+          <span class="value">${r.price}</span>
+        </div>
+        <div class="tile-row">
+          <span class="label">Change</span>
+          <span class="value ${changeClass}">${r.change}</span>
+        </div>
+      </div>
+    </div>
+    <div class="tile-verdict">
+      <div class="verdict-dots">${verdictDots(r.riskScore)}</div>
+      <span class="verdict-text" style="color:${color}">${r.verdict}</span>
+    </div>
+  </a>`;
+}
+
+function render(reports) {
+  const grid = document.getElementById("grid");
+  const countLabel = document.getElementById("countLabel");
+
+  if (reports.length === 0) {
+    grid.innerHTML = `<div class="empty">
+      <div class="empty-icon">&#9744;</div>
+      <h3>No reports found</h3>
+      <p>Try adjusting your filters</p>
+    </div>`;
+  } else {
+    grid.innerHTML = reports.map(renderTile).join("");
+  }
+
+  const total = allReports.length;
+  const shown = reports.length;
+  countLabel.textContent = shown === total ? `${total} report${total !== 1 ? "s" : ""}` : `${shown} of ${total}`;
+}
+
+function applyFilters() {
+  const ticker = document.getElementById("tickerFilter").value.toUpperCase().trim();
+  const dateDays = document.getElementById("dateFilter").value;
+
+  let filtered = allReports;
+
+  if (ticker) {
+    filtered = filtered.filter((r) => r.ticker.includes(ticker));
+  }
+
+  if (dateDays !== "all") {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - parseInt(dateDays, 10));
+    const cutoffStr = cutoff.toISOString().slice(0, 10);
+    filtered = filtered.filter((r) => r.date >= cutoffStr);
+  }
+
+  render(filtered);
+}
+
+async function init() {
+  const res = await fetch("reports.json");
+  allReports = await res.json();
+  render(allReports);
+
+  document.getElementById("tickerFilter").addEventListener("input", applyFilters);
+  document.getElementById("dateFilter").addEventListener("change", applyFilters);
+}
+
+init();
+</script>
+
+</body>
+</html>

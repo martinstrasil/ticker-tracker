@@ -1,0 +1,14 @@
+[
+  {
+    "ticker": "TSLA",
+    "company": "Tesla, Inc. · NASDAQ",
+    "date": "2026-04-14",
+    "time": "13:42",
+    "price": "$352.42",
+    "change": "▼ 20.2% YTD",
+    "changeDir": "neg",
+    "riskScore": 66,
+    "verdict": "HOLD — HIGH RISK",
+    "file": "reports/TSLA_2026-04-14T1342.html"
+  }
+]
