@@ -2,7 +2,7 @@ const fs = require("fs");
 const path = require("path");
 
 const REPORTS_DIR = path.join(__dirname, "reports");
-const OUTPUT_FILE = path.join(__dirname, "reports.json");
+const DIST_DIR = path.join(__dirname, "dist");
 const FILENAME_RE = /^([A-Z]+)_(\d{4}-\d{2}-\d{2})T(\d{2})(\d{2})\.html$/;
 
 /**
@@ -69,8 +69,17 @@ function build() {
     return db.localeCompare(da);
   });
 
-  fs.writeFileSync(OUTPUT_FILE, JSON.stringify(reports, null, 2));
-  console.log(`Built reports.json — ${reports.length} report(s)`);
+  fs.mkdirSync(DIST_DIR, { recursive: true });
+  fs.mkdirSync(path.join(DIST_DIR, "reports"), { recursive: true });
+
+  fs.writeFileSync(path.join(DIST_DIR, "reports.json"), JSON.stringify(reports, null, 2));
+  fs.copyFileSync(path.join(__dirname, "index.html"), path.join(DIST_DIR, "index.html"));
+
+  for (const file of files) {
+    fs.copyFileSync(path.join(REPORTS_DIR, file), path.join(DIST_DIR, "reports", file));
+  }
+
+  console.log(`Built dist/ — ${reports.length} report(s)`);
 }
 
 build();
