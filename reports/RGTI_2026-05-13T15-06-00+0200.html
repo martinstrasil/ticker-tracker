@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RGTI Risk Score Report — May 2026</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#08090d;--surface:#0e1017;--surface2:#141720;--surface3:#1a1e2a;
+    --border:#1e2330;--border-light:#2a3040;
+    --text:#e8eaf0;--text-dim:#8890a4;--text-muted:#565e74;
+    --green:#00e676;--green-dim:#00e67620;--green-bg:#0a2618;
+    --red:#ff5252;--red-dim:#ff525220;--red-bg:#2a0e0e;
+    --amber:#ffab40;--amber-dim:#ffab4020;--amber-bg:#2a1e0a;
+    --gold:#ffc107;--gold-dim:#ffc10718;
+    --cyan:#18ffff;
+    --mono:'JetBrains Mono',monospace;
+    --sans:'DM Sans',sans-serif;
+    --page-w:1080px;
+  }
+  html{font-size:16px}
+  body{background:var(--bg);color:var(--text);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
+
+  .page{max-width:var(--page-w);margin:0 auto;padding:48px 40px;min-height:100vh;position:relative}
+  .page+.page{border-top:1px solid var(--border)}
+  .page::before{content:'';position:absolute;top:0;left:0;right:0;height:260px;background:linear-gradient(180deg,#18ffff08 0%,transparent 100%);pointer-events:none}
+
+  @media print{.page{page-break-before:always;padding:24px}}
+
+  .stock-bar{display:flex;align-items:center;gap:20px;padding:16px 24px;background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:32px;position:relative;overflow:hidden}
+  .stock-bar::after{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--cyan),transparent)}
+  .stock-bar .ticker{font-family:var(--mono);font-size:1.7rem;font-weight:700;letter-spacing:-.02em;color:var(--text)}
+  .stock-bar .company{font-size:.95rem;color:var(--text-dim);margin-left:-8px}
+  .stock-bar .price-block{margin-left:auto;text-align:right}
+  .stock-bar .price{font-family:var(--mono);font-size:1.6rem;font-weight:600}
+  .stock-bar .change{font-family:var(--mono);font-size:.85rem;padding:3px 10px;border-radius:6px;display:inline-block;margin-top:2px}
+  .stock-bar .change.neg{color:var(--red);background:var(--red-dim)}
+  .stock-bar .change.pos{color:var(--green);background:var(--green-dim)}
+  .stock-bar .meta{font-family:var(--mono);font-size:.75rem;color:var(--text-muted);display:flex;flex-direction:column;gap:2px;min-width:200px}
+  .stock-bar .dot{width:8px;height:8px;border-radius:50%;background:var(--cyan);box-shadow:0 0 8px var(--cyan);animation:pulse 2s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+  .gauge-row{display:flex;align-items:center;gap:40px;margin-bottom:36px}
+  .gauge-wrap{width:220px;flex-shrink:0;position:relative}
+  .gauge-wrap svg{width:100%;display:block}
+  .gauge-label{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);text-align:center}
+  .gauge-label .num{font-family:var(--mono);font-size:2.8rem;font-weight:700;line-height:1;color:var(--red)}
+  .gauge-label .sub{font-size:.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.12em;margin-top:2px}
+  .score-desc{flex:1}
+  .score-desc h2{font-size:1.1rem;font-weight:600;margin-bottom:6px;color:var(--red)}
+  .score-desc p{font-size:.88rem;color:var(--text-dim);line-height:1.6;max-width:540px}
+
+  .kpi-strip{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:36px}
+  .kpi{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;position:relative;overflow:hidden}
+  .kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+  .kpi.g::before{background:var(--green)}.kpi.r::before{background:var(--red)}.kpi.a::before{background:var(--amber)}.kpi.b::before{background:var(--cyan)}
+  .kpi .label{font-size:.65rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);margin-bottom:6px}
+  .kpi .val{font-family:var(--mono);font-size:1.15rem;font-weight:600}
+  .kpi .sub{font-family:var(--mono);font-size:.7rem;color:var(--text-muted);margin-top:2px}
+
+  .chart-section{margin-bottom:36px}
+  .chart-section h3{font-size:.75rem;text-transform:uppercase;letter-spacing:.12em;color:var(--text-muted);margin-bottom:12px}
+  .chart-box{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px 24px 16px;position:relative;overflow:hidden}
+  .chart-box svg{width:100%;display:block}
+
+  .pillar-tag{font-size:.62rem;text-transform:uppercase;letter-spacing:.14em;color:var(--text-muted);margin:8px 0 10px}
+  .card-grid-2{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-bottom:22px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px 20px;position:relative;overflow:hidden}
+  .card::before{content:'';position:absolute;top:0;left:0;width:3px;height:100%;border-radius:0 3px 3px 0}
+  .card.green::before{background:var(--green)}.card.red::before{background:var(--red)}.card.amber::before{background:var(--amber)}
+  .card .card-title{font-size:.7rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);margin-bottom:10px;display:flex;align-items:center;gap:8px}
+  .card .card-title .dot-ind{width:6px;height:6px;border-radius:50%}
+  .card.green .dot-ind{background:var(--green)}.card.red .dot-ind{background:var(--red)}.card.amber .dot-ind{background:var(--amber)}
+  .card ul{list-style:none;padding:0}
+  .card li{font-size:.82rem;color:var(--text-dim);padding:4px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+  .card li:last-child{border:none}
+  .card li .v{font-family:var(--mono);font-weight:500;font-size:.8rem}
+  .card li .v.g{color:var(--green)}.card li .v.r{color:var(--red)}.card li .v.a{color:var(--amber)}
+
+  .breakdown{margin-bottom:16px}
+  .breakdown h3{font-size:.75rem;text-transform:uppercase;letter-spacing:.12em;color:var(--text-muted);margin-bottom:14px}
+  .bar-row{display:flex;align-items:center;gap:14px;margin-bottom:10px}
+  .bar-row .bar-label{font-size:.8rem;color:var(--text-dim);width:160px;flex-shrink:0}
+  .bar-row .bar-track{flex:1;height:10px;background:var(--surface2);border-radius:5px;overflow:hidden;position:relative}
+  .bar-row .bar-fill{height:100%;border-radius:5px;position:relative}
+  .bar-row .bar-fill::after{content:'';position:absolute;top:0;right:0;bottom:0;width:40%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.12))}
+  .bar-row .bar-num{font-family:var(--mono);font-size:.8rem;font-weight:600;width:60px;text-align:right;flex-shrink:0}
+
+  .qtable{width:100%;border-collapse:collapse;margin-bottom:36px;font-size:.82rem}
+  .qtable th{font-size:.65rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);font-weight:500;padding:10px 12px;text-align:right;border-bottom:1px solid var(--border-light)}
+  .qtable th:first-child{text-align:left}
+  .qtable td{font-family:var(--mono);font-weight:400;padding:10px 12px;text-align:right;border-bottom:1px solid var(--border);color:var(--text-dim)}
+  .qtable td:first-child{font-family:var(--sans);color:var(--text);text-align:left;font-weight:500}
+  .qtable tr:hover td{background:var(--surface)}
+  .qtable .highlight td{background:var(--surface2);color:var(--text)}
+
+  .dual{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:36px}
+  .dual-col{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px 22px}
+  .dual-col h4{font-size:.7rem;text-transform:uppercase;letter-spacing:.12em;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+  .dual-col h4 .ic{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.65rem}
+  .dual-col.catalysts h4{color:var(--green)}.dual-col.catalysts h4 .ic{background:var(--green-dim);color:var(--green)}
+  .dual-col.risks h4{color:var(--red)}.dual-col.risks h4 .ic{background:var(--red-dim);color:var(--red)}
+  .dual-col li{font-size:.82rem;color:var(--text-dim);padding:6px 0;border-bottom:1px solid var(--border);line-height:1.5}
+  .dual-col li:last-child{border:none}
+  .dual-col ul{list-style:none;padding:0}
+
+  .earnings-box{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px 24px;margin-bottom:36px}
+  .earnings-box h4{font-size:.7rem;text-transform:uppercase;letter-spacing:.12em;color:var(--text-muted);margin-bottom:10px}
+  .earnings-box p{font-size:.88rem;color:var(--text-dim);line-height:1.65}
+  .earnings-box .highlight-date{font-family:var(--mono);color:var(--cyan);font-weight:500}
+
+  .bottom-line{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px 28px;position:relative;overflow:hidden}
+  .bottom-line::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--red),var(--amber),var(--green))}
+  .bottom-line h3{font-size:.95rem;font-weight:600;margin-bottom:8px;color:var(--text)}
+  .bottom-line p{font-size:.88rem;color:var(--text-dim);line-height:1.65;margin-bottom:16px}
+  .rating-bar{display:flex;align-items:center;gap:16px;margin-top:14px}
+  .rating-bar .segments{display:flex;gap:3px;flex:1}
+  .rating-bar .seg{height:8px;flex:1;border-radius:4px;background:var(--surface2)}
+  .rating-bar .seg.active-r{background:var(--red)}.rating-bar .seg.active-a{background:var(--amber)}.rating-bar .seg.active-g{background:var(--green)}
+  .rating-bar .verdict{font-family:var(--mono);font-size:.95rem;font-weight:700;color:var(--amber);white-space:nowrap}
+  .rating-labels{display:flex;justify-content:space-between;margin-top:6px;font-size:.6rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted)}
+
+  .copy-btn{position:fixed;bottom:24px;right:24px;background:var(--surface2);border:1px solid var(--border-light);color:var(--text-dim);font-family:var(--mono);font-size:.75rem;padding:10px 18px;border-radius:8px;cursor:pointer;z-index:100;transition:all .2s}
+  .copy-btn:hover{background:var(--cyan);color:#08090d;border-color:var(--cyan)}
+
+  .section-title{font-size:.75rem;text-transform:uppercase;letter-spacing:.12em;color:var(--text-muted);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+
+  .report-footer{text-align:center;padding:20px 0 0;font-size:.65rem;color:var(--text-muted);border-top:1px solid var(--border);margin-top:32px}
+
+  .analysis-ts-only{font-family:var(--mono);font-size:.7rem;color:var(--text-muted);letter-spacing:.04em;text-align:right;margin-bottom:14px}
+
+  @media(max-width:800px){
+    .kpi-strip{grid-template-columns:repeat(3,1fr)}
+    .card-grid-2{grid-template-columns:1fr}
+    .dual{grid-template-columns:1fr}
+    .stock-bar{flex-wrap:wrap}
+    .gauge-row{flex-direction:column;align-items:flex-start}
+  }
+</style>
+</head>
+<body>
+
+<!-- ========== PAGE 1 ========== -->
+<div class="page" id="page1">
+
+  <div class="analysis-ts-only">2026-05-13 15:06:00 CEST</div>
+
+  <div class="stock-bar">
+    <div class="dot"></div>
+    <div>
+      <div class="ticker">RGTI</div>
+      <div class="company">Rigetti Computing, Inc. &middot; Nasdaq</div>
+    </div>
+    <div class="meta">
+      <span>52w <b style="color:var(--text)">$9.85 – $58.15</b></span>
+      <span>Vol (sess.) <b style="color:var(--text)">49.0M sh</b></span>
+      <span>Mkt Cap <b style="color:var(--text)">~$6.4B</b></span>
+    </div>
+    <div class="price-block">
+      <div class="price">$19.07</div>
+      <div class="change neg">−7.02% (1D)</div>
+    </div>
+  </div>
+
+  <div class="gauge-row">
+    <div class="gauge-wrap">
+      <svg viewBox="0 0 200 120" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="gaugeBg" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#1a1e2a"/>
+            <stop offset="100%" stop-color="#1a1e2a"/>
+          </linearGradient>
+          <linearGradient id="gaugeGrad" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#00e676"/>
+            <stop offset="40%" stop-color="#ffab40"/>
+            <stop offset="100%" stop-color="#ff5252"/>
+          </linearGradient>
+        </defs>
+        <path d="M 20 105 A 80 80 0 0 1 180 105" fill="none" stroke="url(#gaugeBg)" stroke-width="12" stroke-linecap="round"/>
+        <path d="M 20 105 A 80 80 0 0 1 180 105" fill="none" stroke="url(#gaugeGrad)" stroke-width="12" stroke-linecap="round" stroke-dasharray="251" stroke-dashoffset="72.8" opacity=".9"/>
+      </svg>
+      <div class="gauge-label">
+        <div class="num">71</div>
+        <div class="sub">Risk Score</div>
+      </div>
+    </div>
+    <div class="score-desc">
+      <h2>Elevated-to-High Risk — Pre-Revenue Quantum, Big Cash, Stretched Multiple</h2>
+      <p>Rigetti is an early commercial-stage quantum hardware pure-play with a pristine balance sheet (~$569M cash / zero debt) and meaningful technology milestones (108-qubit Cepheus-1-108Q now in general availability, 99.8% two-qubit gate fidelity demonstrated). The equity carries one of the most extreme P/S ratios in U.S. small-caps (~700× TTM revenue), and FY25 revenue actually declined to $7.1M before Q1'26 reignited growth at +199% YoY off a tiny base. With a 67% drawdown from the October 2025 peak still weighing, our composite risk score sits at <strong>71/100</strong> — elevated; suitable only for thematic / venture-style allocations with strict position sizing.</p>
+    </div>
+  </div>
+
+  <div class="kpi-strip">
+    <div class="kpi r">
+      <div class="label">Rev FY25</div>
+      <div class="val" style="color:var(--red)">$7.1M</div>
+      <div class="sub">−36% YoY (GAAP)</div>
+    </div>
+    <div class="kpi g">
+      <div class="label">Q1 '26 Rev</div>
+      <div class="val" style="color:var(--green)">$4.4M</div>
+      <div class="sub">+199% YoY</div>
+    </div>
+    <div class="kpi g">
+      <div class="label">Cash (Mar'26)</div>
+      <div class="val" style="color:var(--green)">$569M</div>
+      <div class="sub">No debt</div>
+    </div>
+    <div class="kpi a">
+      <div class="label">Gross Margin</div>
+      <div class="val" style="color:var(--amber)">31.3%</div>
+      <div class="sub">Q1'26 (mix-driven)</div>
+    </div>
+    <div class="kpi r">
+      <div class="label">P/S (TTM)</div>
+      <div class="val" style="color:var(--red)">~700×</div>
+      <div class="sub">Extreme print</div>
+    </div>
+    <div class="kpi r">
+      <div class="label">Drawdown</div>
+      <div class="val" style="color:var(--red)">−67%</div>
+      <div class="sub">From Oct'25 ATH</div>
+    </div>
+  </div>
+
+  <div class="chart-section">
+    <h3>12-Month Price Action &middot; RGTI (Nasdaq) &middot; Month-End Closes</h3>
+    <div class="chart-box">
+      <svg viewBox="0 0 1000 300" xmlns="http://www.w3.org/2000/svg" style="overflow:visible">
+        <defs>
+          <linearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#18ffff" stop-opacity=".14"/>
+            <stop offset="100%" stop-color="#18ffff" stop-opacity="0"/>
+          </linearGradient>
+          <linearGradient id="lineGrad" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#00e676"/>
+            <stop offset="35%" stop-color="#ffab40"/>
+            <stop offset="100%" stop-color="#ff5252"/>
+          </linearGradient>
+        </defs>
+        <line x1="60" y1="20" x2="60" y2="260" stroke="#1e2330" stroke-width=".5"/>
+        <line x1="60" y1="260" x2="980" y2="260" stroke="#1e2330" stroke-width=".5"/>
+        <line x1="60" y1="65" x2="980" y2="65" stroke="#1e2330" stroke-width=".5" stroke-dasharray="4"/>
+        <line x1="60" y1="130" x2="980" y2="130" stroke="#1e2330" stroke-width=".5" stroke-dasharray="4"/>
+        <line x1="60" y1="195" x2="980" y2="195" stroke="#1e2330" stroke-width=".5" stroke-dasharray="4"/>
+        <text x="50" y="24" font-family="JetBrains Mono" font-size="9" fill="#565e74" text-anchor="end">$60</text>
+        <text x="50" y="69" font-family="JetBrains Mono" font-size="9" fill="#565e74" text-anchor="end">$47</text>
+        <text x="50" y="134" font-family="JetBrains Mono" font-size="9" fill="#565e74" text-anchor="end">$34</text>
+        <text x="50" y="199" font-family="JetBrains Mono" font-size="9" fill="#565e74" text-anchor="end">$20</text>
+        <text x="50" y="264" font-family="JetBrains Mono" font-size="9" fill="#565e74" text-anchor="end">$7</text>
+        <!-- x-axis months -->
+        <text x="80" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Jun'25</text>
+        <text x="160" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Jul'25</text>
+        <text x="240" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Aug'25</text>
+        <text x="320" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Sep'25</text>
+        <text x="400" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Oct'25</text>
+        <text x="480" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Nov'25</text>
+        <text x="560" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Dec'25</text>
+        <text x="640" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Jan'26</text>
+        <text x="720" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Feb'26</text>
+        <text x="800" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Mar'26</text>
+        <text x="880" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Apr'26</text>
+        <text x="960" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">May'26</text>
+        <!-- price line: $11,$14,$22,$36,$53,$42,$22,$24,$17,$15,$15,$19 -->
+        <!-- y = 260 - (price-7)*(240/53) -->
+        <!-- $11→242, $14→228, $22→192, $36→129, $53→52, $42→101, $22→192, $24→183, $17→215, $15→224, $15→224, $19→206 -->
+        <path d="M 80,242 L 160,228 240,192 320,129 400,52 480,101 560,192 640,183 720,215 800,224 880,224 960,206 L 960,260 80,260 Z" fill="url(#chartFill)"/>
+        <polyline points="80,242 160,228 240,192 320,129 400,52 480,101 560,192 640,183 720,215 800,224 880,224 960,206" fill="none" stroke="url(#lineGrad)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+
+        <!-- Annotation: Sep'25 momentum -->
+        <circle cx="320" cy="129" r="3.5" fill="#00e676" stroke="#08090d" stroke-width="1.5"/>
+        <line x1="320" y1="129" x2="320" y2="112" stroke="#00e676" stroke-width=".8" stroke-dasharray="3"/>
+        <rect x="240" y="96" width="160" height="16" rx="4" fill="#0a2618" stroke="#00e676" stroke-width=".5"/>
+        <text x="320" y="107" font-family="JetBrains Mono" font-size="7.5" fill="#00e676" text-anchor="middle">Quantum hype ramp (Sep)</text>
+
+        <!-- Annotation: Oct'25 ATH peak -->
+        <circle cx="400" cy="52" r="4" fill="#ffab40" stroke="#08090d" stroke-width="2"/>
+        <line x1="400" y1="52" x2="400" y2="34" stroke="#ffab40" stroke-width=".8" stroke-dasharray="3"/>
+        <rect x="320" y="18" width="160" height="16" rx="4" fill="#2a1e0a" stroke="#ffab40" stroke-width=".5"/>
+        <text x="400" y="29" font-family="JetBrains Mono" font-size="7.5" fill="#ffab40" text-anchor="middle">ATH $56.34 (Oct 15)</text>
+
+        <!-- Annotation: Apr'26 trough -->
+        <circle cx="880" cy="224" r="4" fill="#ff5252" stroke="#08090d" stroke-width="2"/>
+        <line x1="880" y1="224" x2="880" y2="240" stroke="#ff5252" stroke-width=".8" stroke-dasharray="3"/>
+        <rect x="802" y="242" width="156" height="16" rx="4" fill="#2a0e0e" stroke="#ff5252" stroke-width=".5"/>
+        <text x="880" y="253" font-family="JetBrains Mono" font-size="7.5" fill="#ff5252" text-anchor="middle">De-rate trough (Apr)</text>
+
+        <!-- Annotation: May'26 current -->
+        <circle cx="960" cy="206" r="4" fill="#18ffff" stroke="#08090d" stroke-width="2"/>
+        <line x1="960" y1="206" x2="960" y2="188" stroke="#18ffff" stroke-width=".8" stroke-dasharray="3"/>
+        <rect x="878" y="172" width="164" height="16" rx="4" fill="#0e1017" stroke="#18ffff" stroke-width=".5"/>
+        <text x="960" y="183" font-family="JetBrains Mono" font-size="7.5" fill="#18ffff" text-anchor="middle">Q1 earnings bounce (May)</text>
+      </svg>
+    </div>
+  </div>
+
+  <div class="section-title">Fundamental Scorecard (6 Cards)</div>
+  <div class="pillar-tag">Valuation</div>
+  <div class="card-grid-2">
+    <div class="card red">
+      <div class="card-title"><span class="dot-ind"></span>Valuation &mdash; Multiples &amp; Dilution</div>
+      <ul>
+        <li>Price / Sales (TTM)<span class="v r">~700× (extreme)</span></li>
+        <li>Morningstar fair value<span class="v r">$15.56 (below spot)</span></li>
+        <li>Profitability (GAAP)<span class="v r">Sustained losses</span></li>
+        <li>52w drawdown from ATH<span class="v r">~−67%</span></li>
+        <li>Peer quantum set<span class="v a">Narrative-correlated</span></li>
+      </ul>
+    </div>
+    <div class="card amber">
+      <div class="card-title"><span class="dot-ind"></span>Valuation &mdash; Street &amp; Flows</div>
+      <ul>
+        <li>Avg analyst PT (consensus)<span class="v g">~$30.78</span></li>
+        <li>Upside vs spot<span class="v g">+51.7%</span></li>
+        <li>Rating consensus<span class="v g">Strong Buy</span></li>
+        <li>Retail / thematic flows<span class="v a">Whiplash risk</span></li>
+        <li>Short interest<span class="v a">Elevated episodes</span></li>
+      </ul>
+    </div>
+  </div>
+  <div class="pillar-tag">Financial Health</div>
+  <div class="card-grid-2">
+    <div class="card green">
+      <div class="card-title"><span class="dot-ind"></span>Financial Health &mdash; Liquidity</div>
+      <ul>
+        <li>Cash &amp; investments (Mar'26)<span class="v g">$569.0M</span></li>
+        <li>Debt outstanding<span class="v g">None ($0)</span></li>
+        <li>Runway at current burn<span class="v g">Multi-year (9+ yr)</span></li>
+        <li>Interest income (Q1'26)<span class="v g">~$3M annualized</span></li>
+        <li>Capex (Fab-1 / systems)<span class="v a">Scaling investment</span></li>
+      </ul>
+    </div>
+    <div class="card red">
+      <div class="card-title"><span class="dot-ind"></span>Financial Health &mdash; GAAP Noise &amp; Dilution</div>
+      <ul>
+        <li>Q1'26 GAAP net income<span class="v a">+$33M (warrant gain)</span></li>
+        <li>Q1'26 non-GAAP net loss<span class="v r">−$14.7M</span></li>
+        <li>Shares outstanding<span class="v r">332M (was 184M FY23)</span></li>
+        <li>$350M ATM (Q2'25)<span class="v r">Major dilution event</span></li>
+        <li>Warrant/earn-out accounting<span class="v r">Non-cash swings</span></li>
+      </ul>
+    </div>
+  </div>
+  <div class="pillar-tag">Growth</div>
+  <div class="card-grid-2">
+    <div class="card green">
+      <div class="card-title"><span class="dot-ind"></span>Growth &mdash; Technology &amp; Strategic</div>
+      <ul>
+        <li>108Q Cepheus-1 GA (Q1'26)<span class="v g">Milestone hit</span></li>
+        <li>2Q gate fidelity (9Q sys)<span class="v g">99.8% achieved</span></li>
+        <li>150+ qubit roadmap (YE26)<span class="v g">99.7% target</span></li>
+        <li>1,000+ qubit roadmap (YE27)<span class="v g">99.8% target</span></li>
+        <li>UK $100M investment<span class="v g">Strategic expansion</span></li>
+      </ul>
+    </div>
+    <div class="card amber">
+      <div class="card-title"><span class="dot-ind"></span>Growth &mdash; Revenue &amp; Execution</div>
+      <ul>
+        <li>Q1'26 rev growth<span class="v g">+199% YoY</span></li>
+        <li>FY25 revenue (full year)<span class="v r">$7.1M (−36% YoY)</span></li>
+        <li>Revenue base / scale<span class="v r">Tiny ($4.4M/Q)</span></li>
+        <li>C-DAC $8.4M PO (H2'26)<span class="v a">Lumpy delivery</span></li>
+        <li>Competition (IBM, IonQ, Google)<span class="v a">Crowded field</span></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="breakdown">
+    <h3>Score Breakdown &middot; Weighted Components (35% / 35% / 30%)</h3>
+    <div class="bar-row">
+      <div class="bar-label">Valuation <span style="color:var(--text-muted);font-size:.7rem">(35%)</span></div>
+      <div class="bar-track">
+        <div class="bar-fill" style="width:86%;background:linear-gradient(90deg,var(--amber),var(--red))"></div>
+      </div>
+      <div class="bar-num" style="color:var(--red)">30 / 35</div>
+    </div>
+    <div class="bar-row">
+      <div class="bar-label">Financial Health <span style="color:var(--text-muted);font-size:.7rem">(35%)</span></div>
+      <div class="bar-track">
+        <div class="bar-fill" style="width:51%;background:linear-gradient(90deg,var(--green),var(--amber))"></div>
+      </div>
+      <div class="bar-num" style="color:var(--amber)">18 / 35</div>
+    </div>
+    <div class="bar-row">
+      <div class="bar-label">Growth <span style="color:var(--text-muted);font-size:.7rem">(30%)</span></div>
+      <div class="bar-track">
+        <div class="bar-fill" style="width:77%;background:linear-gradient(90deg,var(--amber),var(--red))"></div>
+      </div>
+      <div class="bar-num" style="color:var(--amber)">23 / 30</div>
+    </div>
+    <div style="text-align:right;font-family:var(--mono);font-size:.85rem;color:var(--text);margin-top:8px;padding-right:0">
+      Composite Risk: <span style="color:var(--red);font-weight:700;font-size:1rem">71 / 100</span>
+      <span style="color:var(--text-muted);font-size:.72rem;margin-left:8px">Higher = Higher Risk</span>
+    </div>
+  </div>
+
+  <div class="report-footer">
+    2026-05-13 15:06:00 CEST &middot; Sources: Rigetti IR (Q1 2026 press release, May 11 2026), MarketBeat, Yahoo Finance, Morningstar &middot; Not investment advice
+  </div>
+</div>
+
+<!-- ========== PAGE 2 ========== -->
+<div class="page" id="page2">
+
+  <div style="display:flex;align-items:baseline;gap:16px;margin-bottom:28px">
+    <span style="font-family:var(--mono);font-size:1.3rem;font-weight:700">RGTI</span>
+    <span style="font-size:.85rem;color:var(--text-dim)">Risk Report — Page 2 of 2</span>
+    <span style="margin-left:auto;font-family:var(--mono);font-size:.75rem;color:var(--text-muted)">2026-05-13 15:06:00 CEST</span>
+  </div>
+
+  <div class="section-title">Quarterly Financial Trends (USD, company-reported / rounded)</div>
+  <table class="qtable">
+    <thead>
+      <tr>
+        <th>Metric</th>
+        <th>Q2 '24</th>
+        <th>Q3 '24</th>
+        <th>Q4 '24</th>
+        <th>Q1 '25</th>
+        <th>Q2 '25</th>
+        <th>Q3 '25</th>
+        <th>Q4 '25</th>
+        <th style="color:var(--cyan)">Q1 '26</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="highlight">
+        <td>Revenue ($M)</td>
+        <td>3.09</td>
+        <td>2.38</td>
+        <td>2.27</td>
+        <td style="color:var(--red)">1.47</td>
+        <td style="color:var(--red)">1.80</td>
+        <td style="color:var(--red)">1.95</td>
+        <td style="color:var(--red)">1.87</td>
+        <td style="color:var(--green)">4.40</td>
+      </tr>
+      <tr>
+        <td>YoY Rev Growth</td>
+        <td>—</td>
+        <td>—</td>
+        <td>—</td>
+        <td style="color:var(--red)">−52%</td>
+        <td style="color:var(--red)">−42%</td>
+        <td style="color:var(--red)">−18%</td>
+        <td style="color:var(--red)">−18%</td>
+        <td style="color:var(--green)">+199%</td>
+      </tr>
+      <tr>
+        <td>GAAP Net Inc / (Loss) ($M)</td>
+        <td style="color:var(--red)">(12)</td>
+        <td style="color:var(--red)">(15)</td>
+        <td style="color:var(--red)">(153)</td>
+        <td style="color:var(--green)">+43</td>
+        <td style="color:var(--red)">(40)</td>
+        <td style="color:var(--red)">(201)</td>
+        <td style="color:var(--red)">(18)</td>
+        <td style="color:var(--green)">+33</td>
+      </tr>
+      <tr>
+        <td>Non-GAAP Net Loss ($M)</td>
+        <td style="color:var(--text-muted)">n/a</td>
+        <td style="color:var(--text-muted)">n/a</td>
+        <td style="color:var(--text-muted)">n/a</td>
+        <td style="color:var(--text-muted)">n/a</td>
+        <td style="color:var(--text-muted)">n/a</td>
+        <td style="color:var(--text-muted)">n/a</td>
+        <td style="color:var(--red)">(11.3)</td>
+        <td style="color:var(--red)">(14.7)</td>
+      </tr>
+      <tr>
+        <td>Cash &amp; Investments ($M)</td>
+        <td>~148</td>
+        <td>~160</td>
+        <td>~217</td>
+        <td>~230</td>
+        <td style="color:var(--green)">572</td>
+        <td style="color:var(--green)">~575</td>
+        <td style="color:var(--green)">590</td>
+        <td style="color:var(--green)">569</td>
+      </tr>
+      <tr>
+        <td>Key Milestone</td>
+        <td>—</td>
+        <td>—</td>
+        <td>—</td>
+        <td>—</td>
+        <td>36Q GA</td>
+        <td>108Q built</td>
+        <td>C-DAC PO</td>
+        <td style="color:var(--cyan)">108Q GA</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="earnings-box">
+    <h4>Latest Earnings / Delivery Update</h4>
+    <p>
+      Rigetti reported <strong>Q1 2026</strong> results (press release, <span class="highlight-date">May 11, 2026</span>): <strong>revenue $4.4M</strong> (+199% YoY; beating consensus of $4.09M), with non-GAAP diluted EPS of <strong>$(0.04)</strong> beating estimates of $(0.05). GAAP net income of $33.1M was driven by a non-cash gain on derivative warrant liabilities (fair-value decrease). Cash &amp; investments stood at <strong>$569.0M</strong> with zero debt. Key delivery: the <strong>108-qubit Cepheus-1-108Q system went into general availability</strong> across Rigetti QCS, Amazon Braket, Azure Quantum, and qBraid — validated as the industry's largest modular gate-based system in production. The company also completed delivery of a 9-qubit Novera QPU to the University of Saskatchewan and announced an intention to invest <strong>up to $100M in the UK</strong> toward a 1,000+ qubit system within 3–4 years.
+    </p>
+  </div>
+
+  <div class="dual">
+    <div class="dual-col catalysts">
+      <h4><span class="ic">▲</span> Catalysts</h4>
+      <ul>
+        <li><strong>Tech execution</strong> — 108Q Cepheus-1 GA; 99.8% 2Q gate fidelity on 9Q with adiabatic CZ; 99.9% on prototypes</li>
+        <li><strong>Balance sheet</strong> — $569M cash / no debt funds multi-year roadmap without further dilution</li>
+        <li><strong>Q1'26 inflection</strong> — +199% YoY revenue; Novera on-prem demand returning; beat consensus</li>
+        <li><strong>C-DAC &amp; UK orders</strong> — $8.4M India PO (H2'26 deploy); up to $100M UK investment pipeline</li>
+        <li><strong>Roadmap clarity</strong> — 150+ qubits at 99.7% by YE26; 1,000+ qubits at 99.8% by YE27</li>
+        <li><strong>Fab-1 &amp; chiplet moat</strong> — proprietary in-house fab + modular chiplet architecture for scaling</li>
+      </ul>
+    </div>
+    <div class="dual-col risks">
+      <h4><span class="ic">▼</span> Risks</h4>
+      <ul>
+        <li><strong>Extreme multiple</strong> — P/S ~700× vs peers (IonQ ~85×); growth must accelerate orders of magnitude</li>
+        <li><strong>Revenue scale</strong> — FY25 was $7.1M (−36% YoY); Q1'26 still only $4.4M; lumpy PO-driven</li>
+        <li><strong>Dilution history</strong> — $350M ATM in Q2'25 nearly doubled share count (184M → 332M)</li>
+        <li><strong>GAAP volatility</strong> — warrant fair-value swings dominate P&amp;L (Q3'25: −$201M; Q1'25: +$43M)</li>
+        <li><strong>Vol &amp; drawdown</strong> — 52w range $9.85–$58.15 (6× span); −67% from ATH; high beta</li>
+        <li><strong>Competition</strong> — IBM (1000+ qubits), Google (Willow), IonQ, neutral-atom / photonics players</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="bottom-line">
+    <h3>Bottom Line</h3>
+    <p>
+      Rigetti offers one of the purest exposures to <strong>chiplet-based superconducting quantum computing</strong>, with technology milestones tracking to schedule and a fortress-class balance sheet that removes near-term survival risk. Q1'26 was a clear positive inflection — revenue reignited, the 108Q system went live across major clouds, and the non-GAAP loss narrowed. The problem remains <strong>valuation vs. scale</strong>: with TTM revenue under $10M supporting a ~$6.4B market cap, the equity prices in flawless multi-year execution with essentially no margin of error. Combined with fresh dilution memory and GAAP noise that can whipsaw quarterly prints, composite risk sits at <strong>71/100</strong>. Skew: <strong>Hold / spec-sleeve only</strong> — size very small, use drawdowns for cost-averaging, and pair with diversified quantum/AI vehicles.
+    </p>
+    <div class="rating-bar">
+      <div class="segments">
+        <div class="seg"></div>
+        <div class="seg"></div>
+        <div class="seg"></div>
+        <div class="seg active-a"></div>
+        <div class="seg active-a"></div>
+        <div class="seg active-a"></div>
+        <div class="seg active-a"></div>
+        <div class="seg active-r"></div>
+        <div class="seg active-r"></div>
+        <div class="seg"></div>
+      </div>
+      <div class="verdict">HOLD — HIGH-RISK SPEC</div>
+    </div>
+    <div class="rating-labels">
+      <span>Strong Buy</span>
+      <span>Buy</span>
+      <span>Hold</span>
+      <span>Sell</span>
+      <span>Strong Sell</span>
+    </div>
+  </div>
+
+  <div class="report-footer">
+    2026-05-13 15:06:00 CEST &middot; Not investment advice &middot; Data snapshots can lag live markets
+  </div>
+</div>
+
+<button class="copy-btn" type="button" onclick="copyReport()">Copy to Clipboard</button>
+
+<script>
+function copyReport(){
+  const text = [];
+  text.push('RGTI (Rigetti Computing, Inc.) RISK SCORE REPORT — 2026-05-13 15:06:00 CEST');
+  text.push('═'.repeat(60));
+  text.push('Price: $19.07 | Day: −7.02% | Mkt Cap ~$6.4B');
+  text.push('52-Week: $9.85 – $58.15 | Vol ~49M sh | Nasdaq');
+  text.push('');
+  text.push('RISK SCORE: 71/100 — Elevated-to-High / Pre-Revenue Quantum');
+  text.push('  Valuation (35%):        30/35');
+  text.push('  Financial Health (35%): 18/35');
+  text.push('  Growth (30%):           23/30');
+  text.push('');
+  text.push('KEY FACTS');
+  text.push('  FY25 Revenue: $7.1M (−36% YoY)');
+  text.push('  Q1\'26 Revenue: $4.4M (+199% YoY) — beat $4.09M est.');
+  text.push('  Cash & Investments: $569.0M | Debt: $0');
+  text.push('  108-qubit Cepheus-1-108Q: General availability Q1\'26');
+  text.push('  Roadmap: 150+ qubits YE26 | 1,000+ qubits YE27');
+  text.push('');
+  text.push('CATALYSTS: 108Q GA, Q1 inflection, $569M cash, UK expansion, C-DAC PO');
+  text.push('RISKS: P/S ~700×, dilution (332M sh), GAAP noise, −67% drawdown, competition');
+  text.push('');
+  text.push('VERDICT: HOLD — HIGH-RISK SPEC');
+  text.push('');
+  text.push('Not investment advice.');
+  navigator.clipboard.writeText(text.join('\n')).then(()=>{
+    const btn = document.querySelector('.copy-btn');
+    btn.textContent = 'Copied';
+    btn.style.background = '#00e676';
+    btn.style.color = '#08090d';
+    btn.style.borderColor = '#00e676';
+    setTimeout(()=>{
+      btn.textContent = 'Copy to Clipboard';
+      btn.style.background = '';
+      btn.style.color = '';
+      btn.style.borderColor = '';
+    }, 2000);
+  });
+}
+</script>
+
+</body>
+</html>

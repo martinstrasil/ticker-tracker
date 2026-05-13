@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QBTS Risk Score Report — May 2026</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#08090d;--surface:#0e1017;--surface2:#141720;--surface3:#1a1e2a;
+    --border:#1e2330;--border-light:#2a3040;
+    --text:#e8eaf0;--text-dim:#8890a4;--text-muted:#565e74;
+    --green:#00e676;--green-dim:#00e67620;--green-bg:#0a2618;
+    --red:#ff5252;--red-dim:#ff525220;--red-bg:#2a0e0e;
+    --amber:#ffab40;--amber-dim:#ffab4020;--amber-bg:#2a1e0a;
+    --gold:#ffc107;--gold-dim:#ffc10718;
+    --cyan:#18ffff;
+    --mono:'JetBrains Mono',monospace;
+    --sans:'DM Sans',sans-serif;
+    --page-w:1080px;
+  }
+  html{font-size:16px}
+  body{background:var(--bg);color:var(--text);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
+
+  .page{max-width:var(--page-w);margin:0 auto;padding:48px 40px;min-height:100vh;position:relative}
+  .page+.page{border-top:1px solid var(--border)}
+  .page::before{content:'';position:absolute;top:0;left:0;right:0;height:260px;background:linear-gradient(180deg,#18ffff08 0%,transparent 100%);pointer-events:none}
+
+  @media print{.page{page-break-before:always;padding:24px}}
+
+  .stock-bar{display:flex;align-items:center;gap:20px;padding:16px 24px;background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:32px;position:relative;overflow:hidden}
+  .stock-bar::after{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--cyan),transparent)}
+  .stock-bar .ticker{font-family:var(--mono);font-size:1.7rem;font-weight:700;letter-spacing:-.02em;color:var(--text)}
+  .stock-bar .company{font-size:.95rem;color:var(--text-dim);margin-left:-8px}
+  .stock-bar .price-block{margin-left:auto;text-align:right}
+  .stock-bar .price{font-family:var(--mono);font-size:1.6rem;font-weight:600}
+  .stock-bar .change{font-family:var(--mono);font-size:.85rem;padding:3px 10px;border-radius:6px;display:inline-block;margin-top:2px}
+  .stock-bar .change.neg{color:var(--red);background:var(--red-dim)}
+  .stock-bar .change.pos{color:var(--green);background:var(--green-dim)}
+  .stock-bar .meta{font-family:var(--mono);font-size:.75rem;color:var(--text-muted);display:flex;flex-direction:column;gap:2px;min-width:200px}
+  .stock-bar .dot{width:8px;height:8px;border-radius:50%;background:var(--cyan);box-shadow:0 0 8px var(--cyan);animation:pulse 2s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+  .gauge-row{display:flex;align-items:center;gap:40px;margin-bottom:36px}
+  .gauge-wrap{width:220px;flex-shrink:0;position:relative}
+  .gauge-wrap svg{width:100%;display:block}
+  .gauge-label{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);text-align:center}
+  .gauge-label .num{font-family:var(--mono);font-size:2.8rem;font-weight:700;line-height:1;color:var(--amber)}
+  .gauge-label .sub{font-size:.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.12em;margin-top:2px}
+  .score-desc{flex:1}
+  .score-desc h2{font-size:1.1rem;font-weight:600;margin-bottom:6px;color:var(--amber)}
+  .score-desc p{font-size:.88rem;color:var(--text-dim);line-height:1.6;max-width:540px}
+
+  .kpi-strip{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:36px}
+  .kpi{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;position:relative;overflow:hidden}
+  .kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+  .kpi.g::before{background:var(--green)}.kpi.r::before{background:var(--red)}.kpi.a::before{background:var(--amber)}.kpi.b::before{background:var(--cyan)}
+  .kpi .label{font-size:.65rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);margin-bottom:6px}
+  .kpi .val{font-family:var(--mono);font-size:1.15rem;font-weight:600}
+  .kpi .sub{font-family:var(--mono);font-size:.7rem;color:var(--text-muted);margin-top:2px}
+
+  .chart-section{margin-bottom:36px}
+  .chart-section h3{font-size:.75rem;text-transform:uppercase;letter-spacing:.12em;color:var(--text-muted);margin-bottom:12px}
+  .chart-box{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px 24px 16px;position:relative;overflow:hidden}
+  .chart-box svg{width:100%;display:block}
+
+  .pillar-tag{font-size:.62rem;text-transform:uppercase;letter-spacing:.14em;color:var(--text-muted);margin:8px 0 10px}
+  .card-grid-2{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-bottom:22px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px 20px;position:relative;overflow:hidden}
+  .card::before{content:'';position:absolute;top:0;left:0;width:3px;height:100%;border-radius:0 3px 3px 0}
+  .card.green::before{background:var(--green)}.card.red::before{background:var(--red)}.card.amber::before{background:var(--amber)}
+  .card .card-title{font-size:.7rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);margin-bottom:10px;display:flex;align-items:center;gap:8px}
+  .card .card-title .dot-ind{width:6px;height:6px;border-radius:50%}
+  .card.green .dot-ind{background:var(--green)}.card.red .dot-ind{background:var(--red)}.card.amber .dot-ind{background:var(--amber)}
+  .card ul{list-style:none;padding:0}
+  .card li{font-size:.82rem;color:var(--text-dim);padding:4px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+  .card li:last-child{border:none}
+  .card li .v{font-family:var(--mono);font-weight:500;font-size:.8rem}
+  .card li .v.g{color:var(--green)}.card li .v.r{color:var(--red)}.card li .v.a{color:var(--amber)}
+
+  .breakdown{margin-bottom:16px}
+  .breakdown h3{font-size:.75rem;text-transform:uppercase;letter-spacing:.12em;color:var(--text-muted);margin-bottom:14px}
+  .bar-row{display:flex;align-items:center;gap:14px;margin-bottom:10px}
+  .bar-row .bar-label{font-size:.8rem;color:var(--text-dim);width:160px;flex-shrink:0}
+  .bar-row .bar-track{flex:1;height:10px;background:var(--surface2);border-radius:5px;overflow:hidden;position:relative}
+  .bar-row .bar-fill{height:100%;border-radius:5px;position:relative}
+  .bar-row .bar-fill::after{content:'';position:absolute;top:0;right:0;bottom:0;width:40%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.12))}
+  .bar-row .bar-num{font-family:var(--mono);font-size:.8rem;font-weight:600;width:60px;text-align:right;flex-shrink:0}
+
+  .qtable{width:100%;border-collapse:collapse;margin-bottom:36px;font-size:.82rem}
+  .qtable th{font-size:.65rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);font-weight:500;padding:10px 12px;text-align:right;border-bottom:1px solid var(--border-light)}
+  .qtable th:first-child{text-align:left}
+  .qtable td{font-family:var(--mono);font-weight:400;padding:10px 12px;text-align:right;border-bottom:1px solid var(--border);color:var(--text-dim)}
+  .qtable td:first-child{font-family:var(--sans);color:var(--text);text-align:left;font-weight:500}
+  .qtable tr:hover td{background:var(--surface)}
+  .qtable .highlight td{background:var(--surface2);color:var(--text)}
+
+  .dual{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:36px}
+  .dual-col{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px 22px}
+  .dual-col h4{font-size:.7rem;text-transform:uppercase;letter-spacing:.12em;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+  .dual-col h4 .ic{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.65rem}
+  .dual-col.catalysts h4{color:var(--green)}.dual-col.catalysts h4 .ic{background:var(--green-dim);color:var(--green)}
+  .dual-col.risks h4{color:var(--red)}.dual-col.risks h4 .ic{background:var(--red-dim);color:var(--red)}
+  .dual-col li{font-size:.82rem;color:var(--text-dim);padding:6px 0;border-bottom:1px solid var(--border);line-height:1.5}
+  .dual-col li:last-child{border:none}
+  .dual-col ul{list-style:none;padding:0}
+
+  .earnings-box{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px 24px;margin-bottom:36px}
+  .earnings-box h4{font-size:.7rem;text-transform:uppercase;letter-spacing:.12em;color:var(--text-muted);margin-bottom:10px}
+  .earnings-box p{font-size:.88rem;color:var(--text-dim);line-height:1.65}
+  .earnings-box .highlight-date{font-family:var(--mono);color:var(--cyan);font-weight:500}
+
+  .bottom-line{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px 28px;position:relative;overflow:hidden}
+  .bottom-line::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--red),var(--amber),var(--green))}
+  .bottom-line h3{font-size:.95rem;font-weight:600;margin-bottom:8px;color:var(--text)}
+  .bottom-line p{font-size:.88rem;color:var(--text-dim);line-height:1.65;margin-bottom:16px}
+  .rating-bar{display:flex;align-items:center;gap:16px;margin-top:14px}
+  .rating-bar .segments{display:flex;gap:3px;flex:1}
+  .rating-bar .seg{height:8px;flex:1;border-radius:4px;background:var(--surface2)}
+  .rating-bar .seg.active-r{background:var(--red)}.rating-bar .seg.active-a{background:var(--amber)}.rating-bar .seg.active-g{background:var(--green)}
+  .rating-bar .verdict{font-family:var(--mono);font-size:.95rem;font-weight:700;color:var(--amber);white-space:nowrap}
+  .rating-labels{display:flex;justify-content:space-between;margin-top:6px;font-size:.6rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted)}
+
+  .copy-btn{position:fixed;bottom:24px;right:24px;background:var(--surface2);border:1px solid var(--border-light);color:var(--text-dim);font-family:var(--mono);font-size:.75rem;padding:10px 18px;border-radius:8px;cursor:pointer;z-index:100;transition:all .2s}
+  .copy-btn:hover{background:var(--cyan);color:#08090d;border-color:var(--cyan)}
+
+  .section-title{font-size:.75rem;text-transform:uppercase;letter-spacing:.12em;color:var(--text-muted);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+
+  .report-footer{text-align:center;padding:20px 0 0;font-size:.65rem;color:var(--text-muted);border-top:1px solid var(--border);margin-top:32px}
+
+  .analysis-ts-only{font-family:var(--mono);font-size:.7rem;color:var(--text-muted);letter-spacing:.04em;text-align:right;margin-bottom:14px}
+
+  @media(max-width:800px){
+    .kpi-strip{grid-template-columns:repeat(3,1fr)}
+    .card-grid-2{grid-template-columns:1fr}
+    .dual{grid-template-columns:1fr}
+    .stock-bar{flex-wrap:wrap}
+    .gauge-row{flex-direction:column;align-items:flex-start}
+  }
+</style>
+</head>
+<body>
+
+<!-- ========== PAGE 1 ========== -->
+<div class="page" id="page1">
+
+  <div class="analysis-ts-only">2026-05-13 15:06 CEST</div>
+
+  <div class="stock-bar">
+    <div class="dot"></div>
+    <div>
+      <div class="ticker">QBTS</div>
+      <div class="company">D-Wave Quantum Inc. &middot; NYSE</div>
+    </div>
+    <div class="meta">
+      <span>52w <b style="color:var(--text)">$10.36 – $46.75</b></span>
+      <span>Vol (sess.) <b style="color:var(--text)">46.9M sh</b></span>
+      <span>Mkt Cap <b style="color:var(--text)">~$8.0B</b></span>
+    </div>
+    <div class="price-block">
+      <div class="price">$22.35</div>
+      <div class="change neg">−6.99% (1D)</div>
+    </div>
+  </div>
+
+  <div class="gauge-row">
+    <div class="gauge-wrap">
+      <svg viewBox="0 0 200 120" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="gaugeBg" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#1a1e2a"/>
+            <stop offset="100%" stop-color="#1a1e2a"/>
+          </linearGradient>
+          <linearGradient id="gaugeGrad" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#00e676"/>
+            <stop offset="40%" stop-color="#ffab40"/>
+            <stop offset="100%" stop-color="#ff5252"/>
+          </linearGradient>
+        </defs>
+        <path d="M 20 105 A 80 80 0 0 1 180 105" fill="none" stroke="url(#gaugeBg)" stroke-width="12" stroke-linecap="round"/>
+        <!-- 63/100 -> dasharray 251, dashoffset 251*(1-0.63)=92.87 -->
+        <path d="M 20 105 A 80 80 0 0 1 180 105" fill="none" stroke="url(#gaugeGrad)" stroke-width="12" stroke-linecap="round" stroke-dasharray="251" stroke-dashoffset="92.87" opacity=".9"/>
+      </svg>
+      <div class="gauge-label">
+        <div class="num">63</div>
+        <div class="sub">Risk Score</div>
+      </div>
+    </div>
+    <div class="score-desc">
+      <h2>Elevated Risk — Strong Cash &amp; Bookings, Lumpy Revenue</h2>
+      <p>D-Wave just printed a <strong>record bookings quarter ($33.4M, +1,994% YoY)</strong> on the back of a $20M Florida Atlantic University system sale and a $10M Fortune 100 QCaaS deal — but Q1'26 GAAP revenue was <strong>$2.9M (−81% YoY)</strong> against a Q1'25 base inflated by a one-time annealing system sale. Liquidity is fortress-grade ($588M cash, post-Quantum Circuits acquisition), yet GAAP losses, expanding burn, and warrant-driven dilution remain. The composite sits at <strong>63/100</strong> — a speculative, high-beta thematic name with a credible commercial wedge but extreme realized volatility.</p>
+    </div>
+  </div>
+
+  <div class="kpi-strip">
+    <div class="kpi g">
+      <div class="label">Bookings Q1</div>
+      <div class="val" style="color:var(--green)">$33.4M</div>
+      <div class="sub">+1,994% YoY</div>
+    </div>
+    <div class="kpi g">
+      <div class="label">Cash &amp; MS</div>
+      <div class="val" style="color:var(--green)">$588.4M</div>
+      <div class="sub">+93% YoY</div>
+    </div>
+    <div class="kpi g">
+      <div class="label">RPO (Q1'26)</div>
+      <div class="val" style="color:var(--green)">$42.4M</div>
+      <div class="sub">+563% YoY</div>
+    </div>
+    <div class="kpi r">
+      <div class="label">Rev Q1'26</div>
+      <div class="val" style="color:var(--red)">$2.9M</div>
+      <div class="sub">−81% YoY</div>
+    </div>
+    <div class="kpi r">
+      <div class="label">Adj EBITDA</div>
+      <div class="val" style="color:var(--red)">($32.8M)</div>
+      <div class="sub">Q1 loss expanding</div>
+    </div>
+    <div class="kpi a">
+      <div class="label">PT (consensus)</div>
+      <div class="val" style="color:var(--amber)">$32.53</div>
+      <div class="sub">~+46% upside</div>
+    </div>
+  </div>
+
+  <div class="chart-section">
+    <h3>12-Month Price Action &middot; QBTS (NYSE) &middot; Approx. Month-End Closes</h3>
+    <div class="chart-box">
+      <svg viewBox="0 0 1000 300" xmlns="http://www.w3.org/2000/svg" style="overflow:visible">
+        <defs>
+          <linearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#18ffff" stop-opacity=".14"/>
+            <stop offset="100%" stop-color="#18ffff" stop-opacity="0"/>
+          </linearGradient>
+          <linearGradient id="lineGrad" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#00e676"/>
+            <stop offset="50%" stop-color="#ffab40"/>
+            <stop offset="100%" stop-color="#ff5252"/>
+          </linearGradient>
+        </defs>
+        <!-- axes -->
+        <line x1="60" y1="20" x2="60" y2="260" stroke="#1e2330" stroke-width=".5"/>
+        <line x1="60" y1="260" x2="980" y2="260" stroke="#1e2330" stroke-width=".5"/>
+        <line x1="60" y1="80" x2="980" y2="80" stroke="#1e2330" stroke-width=".5" stroke-dasharray="4"/>
+        <line x1="60" y1="140" x2="980" y2="140" stroke="#1e2330" stroke-width=".5" stroke-dasharray="4"/>
+        <line x1="60" y1="200" x2="980" y2="200" stroke="#1e2330" stroke-width=".5" stroke-dasharray="4"/>
+        <!-- y-axis labels: $50, $40, $30, $20, $10 -->
+        <text x="50" y="24" font-family="JetBrains Mono" font-size="9" fill="#565e74" text-anchor="end">$50</text>
+        <text x="50" y="84" font-family="JetBrains Mono" font-size="9" fill="#565e74" text-anchor="end">$40</text>
+        <text x="50" y="144" font-family="JetBrains Mono" font-size="9" fill="#565e74" text-anchor="end">$30</text>
+        <text x="50" y="204" font-family="JetBrains Mono" font-size="9" fill="#565e74" text-anchor="end">$20</text>
+        <text x="50" y="264" font-family="JetBrains Mono" font-size="9" fill="#565e74" text-anchor="end">$10</text>
+        <!-- x-axis labels -->
+        <text x="80" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">May'25</text>
+        <text x="155" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Jun'25</text>
+        <text x="230" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Jul'25</text>
+        <text x="305" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Aug'25</text>
+        <text x="380" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Sep'25</text>
+        <text x="455" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Oct'25</text>
+        <text x="530" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Nov'25</text>
+        <text x="605" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Dec'25</text>
+        <text x="680" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Jan'26</text>
+        <text x="755" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Feb'26</text>
+        <text x="830" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Mar'26</text>
+        <text x="905" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">Apr'26</text>
+        <text x="980" y="280" font-family="JetBrains Mono" font-size="8" fill="#565e74" text-anchor="middle">May'26</text>
+
+        <!-- price points (y = 20 + (50-px)*6); x stride ~75px from x=80 -->
+        <!-- May'25 ~$10.5 -> y=257 -->
+        <!-- Jun'25 ~$13   -> y=242 -->
+        <!-- Jul'25 ~$16   -> y=224 -->
+        <!-- Aug'25 ~$19   -> y=206 -->
+        <!-- Sep'25 ~$28   -> y=152 -->
+        <!-- Oct'25 ~$35 (closed near peak; intraday $46.75 / close $44.78 on Oct 15) -> y=110 -->
+        <!-- Nov'25 ~$32   -> y=128 -->
+        <!-- Dec'25  $26.15 -> y=163 -->
+        <!-- Jan'26 ~$28.13 -> y=151 -->
+        <!-- Feb'26 ~$22   -> y=188 -->
+        <!-- Mar'26 ~$15   -> y=230 -->
+        <!-- Apr'26 ~$14   -> y=236 -->
+        <!-- May'26  $22.35 -> y=186 -->
+
+        <path d="M 80,257 L 155,242 230,224 305,206 380,152 455,110 530,128 605,163 680,151 755,188 830,230 905,236 980,186 L 980,260 80,260 Z" fill="url(#chartFill)"/>
+        <polyline points="80,257 155,242 230,224 305,206 380,152 455,110 530,128 605,163 680,151 755,188 830,230 905,236 980,186" fill="none" stroke="url(#lineGrad)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+
+        <!-- Annotation 1: Oct'25 peak -->
+        <circle cx="455" cy="110" r="4" fill="#00e676" stroke="#08090d" stroke-width="2"/>
+        <line x1="455" y1="110" x2="455" y2="92" stroke="#00e676" stroke-width=".8" stroke-dasharray="3"/>
+        <rect x="372" y="76" width="166" height="16" rx="4" fill="#0a2618" stroke="#00e676" stroke-width=".5"/>
+        <text x="455" y="87" font-family="JetBrains Mono" font-size="7.5" fill="#00e676" text-anchor="middle">All-time high $44.78 (Oct 15)</text>
+
+        <!-- Annotation 2: Feb'26 FY25 print -->
+        <circle cx="755" cy="188" r="4" fill="#ffab40" stroke="#08090d" stroke-width="2"/>
+        <line x1="755" y1="188" x2="755" y2="170" stroke="#ffab40" stroke-width=".8" stroke-dasharray="3"/>
+        <rect x="675" y="154" width="160" height="16" rx="4" fill="#2a1e0a" stroke="#ffab40" stroke-width=".5"/>
+        <text x="755" y="165" font-family="JetBrains Mono" font-size="7.5" fill="#ffab40" text-anchor="middle">FY25 print &middot; $884M cash</text>
+
+        <!-- Annotation 3: Apr drawdown -->
+        <circle cx="905" cy="236" r="4" fill="#ff5252" stroke="#08090d" stroke-width="2"/>
+        <line x1="905" y1="236" x2="905" y2="254" stroke="#ff5252" stroke-width=".8" stroke-dasharray="3"/>
+        <rect x="824" y="266" width="162" height="16" rx="4" fill="#2a0e0e" stroke="#ff5252" stroke-width=".5"/>
+        <text x="905" y="277" font-family="JetBrains Mono" font-size="7.5" fill="#ff5252" text-anchor="middle">Drawdown ~$14 / de-rate</text>
+
+        <!-- Annotation 4: Q1'26 print + bookings spike -->
+        <circle cx="980" cy="186" r="4" fill="#18ffff" stroke="#08090d" stroke-width="2"/>
+        <line x1="980" y1="186" x2="980" y2="168" stroke="#18ffff" stroke-width=".8" stroke-dasharray="3"/>
+        <rect x="876" y="152" width="180" height="16" rx="4" fill="#0e1017" stroke="#18ffff" stroke-width=".5"/>
+        <text x="966" y="163" font-family="JetBrains Mono" font-size="7.5" fill="#18ffff" text-anchor="middle">Q1'26 print &middot; bookings +1,994%</text>
+      </svg>
+    </div>
+  </div>
+
+  <div class="section-title">Fundamental Scorecard (6 Cards)</div>
+  <div class="pillar-tag">Valuation</div>
+  <div class="card-grid-2">
+    <div class="card red">
+      <div class="card-title"><span class="dot-ind"></span>Valuation &mdash; Multiples &amp; Dilution</div>
+      <ul>
+        <li>EV / TTM Sales (FY25 $24.6M)<span class="v r">~300×</span></li>
+        <li>Profitability (GAAP)<span class="v r">Net loss $355M FY25</span></li>
+        <li>Share count (Q1'26)<span class="v r">370M (+3% QoQ)</span></li>
+        <li>Warrant remeasurement<span class="v r">$270M FY25 charge</span></li>
+        <li>52w drawdown from peak<span class="v a">~−52% off $46.75</span></li>
+      </ul>
+    </div>
+    <div class="card amber">
+      <div class="card-title"><span class="dot-ind"></span>Valuation &mdash; Street &amp; Flows</div>
+      <ul>
+        <li>Avg analyst PT<span class="v g">$32.53 (~+46%)</span></li>
+        <li>Consensus rating<span class="v g">Strong Buy (avg.)</span></li>
+        <li>YTD 2026 perf.<span class="v r">~−12% (vs IPO peer)</span></li>
+        <li>1M momentum<span class="v g">+55% to +67%</span></li>
+        <li>Listing liquidity (NYSE)<span class="v g">~47M sh / day</span></li>
+      </ul>
+    </div>
+  </div>
+  <div class="pillar-tag">Financial Health</div>
+  <div class="card-grid-2">
+    <div class="card green">
+      <div class="card-title"><span class="dot-ind"></span>Financial Health &mdash; Liquidity</div>
+      <ul>
+        <li>Cash &amp; investments (Q1'26)<span class="v g">$588.4M</span></li>
+        <li>YE25 cash (record)<span class="v g">$884.5M</span></li>
+        <li>Total liabilities<span class="v g">$75.6M (light)</span></li>
+        <li>Stockholders' equity<span class="v g">$1.12B</span></li>
+        <li>Near-term maturities<span class="v g">Negligible</span></li>
+      </ul>
+    </div>
+    <div class="card red">
+      <div class="card-title"><span class="dot-ind"></span>Financial Health &mdash; Burn &amp; GAAP</div>
+      <ul>
+        <li>Adj. EBITDA Loss (Q1'26)<span class="v r">($32.8M)</span></li>
+        <li>FY25 Adj. EBITDA Loss<span class="v r">($71.8M)</span></li>
+        <li>OpEx growth (Q1 YoY)<span class="v r">+125%</span></li>
+        <li>Implied burn (annualized)<span class="v a">~$130M run-rate</span></li>
+        <li>Runway (cash / burn)<span class="v a">~4–5 years</span></li>
+      </ul>
+    </div>
+  </div>
+  <div class="pillar-tag">Growth</div>
+  <div class="card-grid-2">
+    <div class="card amber">
+      <div class="card-title"><span class="dot-ind"></span>Growth &mdash; Revenue &amp; Bookings</div>
+      <ul>
+        <li>Q1'26 revenue<span class="v r">$2.9M (−81% YoY)</span></li>
+        <li>FY25 revenue<span class="v g">$24.6M (+179% YoY)</span></li>
+        <li>Q1'26 bookings<span class="v g">$33.4M (+1,994%)</span></li>
+        <li>RPO (Q1'26)<span class="v g">$42.4M (+563%)</span></li>
+        <li>Customers (FY25)<span class="v g">135+ / 70 commercial</span></li>
+      </ul>
+    </div>
+    <div class="card amber">
+      <div class="card-title"><span class="dot-ind"></span>Growth &mdash; Tech &amp; Strategy</div>
+      <ul>
+        <li>Quantum Circuits acq.<span class="v a">Gate-model entry</span></li>
+        <li>Roadmap milestone<span class="v a">175 qubits by EOY 2028</span></li>
+        <li>Path to "quantum utility"<span class="v r">100 logical → 2032</span></li>
+        <li>Competition (IONQ, RGTI, hyperscalers)<span class="v a">Crowded</span></li>
+        <li>Investor Day (Jun 1)<span class="v g">Catalyst window</span></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="breakdown">
+    <h3>Score Breakdown &middot; Weighted Components (35% / 35% / 30%)</h3>
+    <div class="bar-row">
+      <div class="bar-label">Valuation <span style="color:var(--text-muted);font-size:.7rem">(35%)</span></div>
+      <div class="bar-track">
+        <div class="bar-fill" style="width:74%;background:linear-gradient(90deg,var(--red),var(--amber))"></div>
+      </div>
+      <div class="bar-num" style="color:var(--amber)">26 / 35</div>
+    </div>
+    <div class="bar-row">
+      <div class="bar-label">Financial Health <span style="color:var(--text-muted);font-size:.7rem">(35%)</span></div>
+      <div class="bar-track">
+        <div class="bar-fill" style="width:54%;background:linear-gradient(90deg,var(--amber),var(--cyan))"></div>
+      </div>
+      <div class="bar-num" style="color:var(--amber)">19 / 35</div>
+    </div>
+    <div class="bar-row">
+      <div class="bar-label">Growth <span style="color:var(--text-muted);font-size:.7rem">(30%)</span></div>
+      <div class="bar-track">
+        <div class="bar-fill" style="width:60%;background:linear-gradient(90deg,var(--amber),var(--green))"></div>
+      </div>
+      <div class="bar-num" style="color:var(--amber)">18 / 30</div>
+    </div>
+    <div style="text-align:right;font-family:var(--mono);font-size:.85rem;color:var(--text);margin-top:8px;padding-right:0">
+      Composite Risk: <span style="color:var(--amber);font-weight:700;font-size:1rem">63 / 100</span>
+      <span style="color:var(--text-muted);font-size:.72rem;margin-left:8px">Higher = Higher Risk</span>
+    </div>
+  </div>
+
+  <div class="report-footer">
+    2026-05-13 15:06 CEST &middot; Sources: Yahoo Finance / Stockanalysis (market), D-Wave IR &amp; SEC 8-K (Q1'26 May 12, 2026; FY25 Feb 26, 2026), Macrotrends (price history) &middot; Not investment advice
+  </div>
+</div>
+
+<!-- ========== PAGE 2 ========== -->
+<div class="page" id="page2">
+
+  <div style="display:flex;align-items:baseline;gap:16px;margin-bottom:28px">
+    <span style="font-family:var(--mono);font-size:1.3rem;font-weight:700">QBTS</span>
+    <span style="font-size:.85rem;color:var(--text-dim)">Risk Report — Page 2 of 2</span>
+    <span style="margin-left:auto;font-family:var(--mono);font-size:.75rem;color:var(--text-muted)">2026-05-13 15:06 CEST</span>
+  </div>
+
+  <div class="section-title">Quarterly Financial Trends (USD, company-reported / rounded)</div>
+  <table class="qtable">
+    <thead>
+      <tr>
+        <th>Metric</th>
+        <th>Q1 '24</th>
+        <th>Q2 '24</th>
+        <th>Q3 '24</th>
+        <th>Q4 '24</th>
+        <th>Q1 '25</th>
+        <th>Q2 '25</th>
+        <th>Q3 '25</th>
+        <th>Q4 '25</th>
+        <th style="color:var(--cyan)">Q1 '26</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="highlight">
+        <td>Revenue ($M)</td>
+        <td>2.5</td>
+        <td>2.0</td>
+        <td>2.0</td>
+        <td>2.3</td>
+        <td style="color:var(--green)">15.0</td>
+        <td>3.1</td>
+        <td>3.7</td>
+        <td>2.8</td>
+        <td style="color:var(--red)">2.9</td>
+      </tr>
+      <tr>
+        <td>YoY Rev Growth</td>
+        <td>—</td>
+        <td>—</td>
+        <td>—</td>
+        <td>—</td>
+        <td style="color:var(--green)">+509%</td>
+        <td style="color:var(--green)">+50%</td>
+        <td style="color:var(--green)">+85%</td>
+        <td style="color:var(--green)">+19%</td>
+        <td style="color:var(--red)">−81%</td>
+      </tr>
+      <tr>
+        <td>Bookings ($M)</td>
+        <td>—</td>
+        <td>—</td>
+        <td>—</td>
+        <td>18.3</td>
+        <td>1.6</td>
+        <td>1.3</td>
+        <td>2.4</td>
+        <td>13.4</td>
+        <td style="color:var(--green)">33.4</td>
+      </tr>
+      <tr>
+        <td>GAAP Gross Margin</td>
+        <td>—</td>
+        <td>—</td>
+        <td>—</td>
+        <td>63.8%</td>
+        <td style="color:var(--green)">92.5%</td>
+        <td>—</td>
+        <td>—</td>
+        <td>64.8%</td>
+        <td style="color:var(--amber)">63.6%</td>
+      </tr>
+      <tr>
+        <td>GAAP EPS (dil.)</td>
+        <td style="color:var(--text-muted)">n/m</td>
+        <td style="color:var(--text-muted)">n/m</td>
+        <td style="color:var(--text-muted)">n/m</td>
+        <td style="color:var(--red)">($0.37)</td>
+        <td style="color:var(--red)">($0.02)</td>
+        <td style="color:var(--text-muted)">n/m</td>
+        <td style="color:var(--text-muted)">n/m</td>
+        <td style="color:var(--red)">($0.12)</td>
+        <td style="color:var(--red)">($0.05)</td>
+      </tr>
+      <tr>
+        <td>Cash &amp; Mkt Sec ($M)</td>
+        <td>—</td>
+        <td>—</td>
+        <td>—</td>
+        <td>178.0</td>
+        <td>304.3</td>
+        <td>—</td>
+        <td>836.2</td>
+        <td style="color:var(--green)">884.5</td>
+        <td style="color:var(--green)">588.4</td>
+      </tr>
+      <tr>
+        <td>RPO ($M)</td>
+        <td>—</td>
+        <td>—</td>
+        <td>—</td>
+        <td>—</td>
+        <td>6.4</td>
+        <td>—</td>
+        <td>—</td>
+        <td>13.4</td>
+        <td style="color:var(--green)">42.4</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="earnings-box">
+    <h4>Latest Earnings / Delivery Update</h4>
+    <p>
+      D-Wave reported <strong>Q1 2026</strong> results pre-market on <span class="highlight-date">May 12, 2026</span>: <strong>revenue $2.9M (−81% YoY)</strong> against a Q1'25 base distorted by a one-time $12.6M annealing system sale, <strong>EPS −$0.05</strong> (beat consensus −$0.07/−$0.09), and a <strong>record $33.4M in quarterly bookings (+1,994% YoY)</strong> headlined by a $20M Florida Atlantic University Advantage2™ purchase and a $10M, two-year QCaaS deal with a Fortune 100 enterprise. Cash &amp; marketable investments stand at <strong>$588.4M</strong> (down from a record $884.5M at YE25, primarily reflecting the <strong>Quantum Circuits acquisition</strong> closed in January). RPO of <strong>$42.4M</strong> (+563% YoY) provides forward visibility, with ~54% expected to convert to revenue in the next 12 months. The stock fell <strong>~7%</strong> on the print as the headline revenue miss outweighed bookings/balance-sheet positives. <strong>Investor Day</strong> at NYSE is scheduled for <span class="highlight-date">June 1, 2026</span>.
+    </p>
+  </div>
+
+  <div class="dual">
+    <div class="dual-col catalysts">
+      <h4><span class="ic">▲</span> Catalysts</h4>
+      <ul>
+        <li><strong>Bookings inflection</strong> — $33.4M Q1'26 + $30M+ in January alone signals demand pull-through</li>
+        <li><strong>Quantum Circuits acquisition</strong> — adds error-corrected dual-rail gate-model platform; only dual-platform pure-play</li>
+        <li><strong>Investor Day (Jun 1, 2026)</strong> — roadmap detail at NYSE; near-term re-rating window</li>
+        <li><strong>Fortress balance sheet</strong> — $588M cash funds 4–5 years at current burn</li>
+        <li><strong>FAU $20M system sale</strong> — second commercial annealing system sale validates pricing power</li>
+        <li><strong>Quantum supremacy claim</strong> — Advantage2™ unchallenged ~2 years post-publication</li>
+      </ul>
+    </div>
+    <div class="dual-col risks">
+      <h4><span class="ic">▼</span> Risks</h4>
+      <ul>
+        <li><strong>Revenue lumpiness</strong> — recognition tied to system sales; quarterly prints volatile (Q1 −81%)</li>
+        <li><strong>Burn expansion</strong> — Q1 Adj EBITDA loss $32.8M; OpEx +125% YoY post-acquisition</li>
+        <li><strong>Warrant noise</strong> — $270M FY25 non-cash GAAP charge from warrant remeasurement</li>
+        <li><strong>Dilution</strong> — 358.7M → 370M shares in one quarter; ongoing warrant exercises</li>
+        <li><strong>Long path to utility</strong> — 100 logical qubits not until ~2032 per roadmap</li>
+        <li><strong>Volatility</strong> — 52-week range $10.36–$46.75 implies severe gap risk both directions</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="bottom-line">
+    <h3>Bottom Line</h3>
+    <p>
+      D-Wave is the <strong>only commercial dual-platform quantum pure-play</strong> with a record $33.4M bookings quarter, $588M of cash, and a credible (if long-dated) gate-model roadmap via the Quantum Circuits acquisition. Counterweights are real and structural: Q1'26 GAAP revenue of <strong>just $2.9M against a $54.7M operating loss</strong>, a ~$130M annualized burn, persistent dilution, and warrant-driven GAAP volatility that masks underlying economics. With composite <strong>risk at 63/100</strong>, this is a <strong>speculative, high-beta thematic</strong> — appropriate for risk-budget growth/spec sleeves, inappropriate as a core position. We skew <strong>Hold</strong> with a tactical lean: position-size small, treat the <strong>Jun 1 Investor Day</strong> as a binary near-term re-rating event, and avoid chasing into momentum spikes given the >4× 52-week range.
+    </p>
+    <div class="rating-bar">
+      <div class="segments">
+        <div class="seg"></div>
+        <div class="seg"></div>
+        <div class="seg"></div>
+        <div class="seg active-a"></div>
+        <div class="seg active-a"></div>
+        <div class="seg active-a"></div>
+        <div class="seg active-a"></div>
+        <div class="seg"></div>
+        <div class="seg"></div>
+        <div class="seg"></div>
+      </div>
+      <div class="verdict">HOLD — SPECULATIVE / RISK-BUDGET</div>
+    </div>
+    <div class="rating-labels">
+      <span>Strong Buy</span>
+      <span>Buy</span>
+      <span>Hold</span>
+      <span>Sell</span>
+      <span>Strong Sell</span>
+    </div>
+  </div>
+
+  <div class="report-footer">
+    2026-05-13 15:06 CEST &middot; Not investment advice &middot; Data snapshots can lag live markets
+  </div>
+</div>
+
+<button class="copy-btn" type="button" onclick="copyReport()">Copy to Clipboard</button>
+
+<script>
+function copyReport(){
+  const text = [];
+  text.push('QBTS (D-Wave Quantum Inc.) RISK SCORE REPORT — 2026-05-13 15:06 CEST');
+  text.push('═'.repeat(60));
+  text.push('Price: $22.35 | Day: −6.99% | Mkt Cap ~$8.0B');
+  text.push('52-Week: $10.36 – $46.75 | Vol ~46.9M sh');
+  text.push('');
+  text.push('RISK SCORE: 63/100 — Elevated / Speculative Quantum Pure-Play');
+  text.push('  Valuation (35%):        26/35');
+  text.push('  Financial Health (35%): 19/35');
+  text.push('  Growth (30%):           18/30');
+  text.push('');
+  text.push('KEY FACTS (Q1 2026, reported May 12, 2026)');
+  text.push('  Revenue:        $2.9M  (−81% YoY; tough Q1\'25 system-sale comp)');
+  text.push('  Bookings:       $33.4M (+1,994% YoY; record)');
+  text.push('  RPO:            $42.4M (+563% YoY)');
+  text.push('  Cash & Mkt Sec: $588.4M (post Quantum Circuits acq.)');
+  text.push('  EPS:            −$0.05 (beat −$0.07/$0.09 cons.)');
+  text.push('  Adj EBITDA:     −$32.8M');
+  text.push('');
+  text.push('FY 2025: Revenue $24.6M (+179% YoY) | Adj EBITDA Loss $71.8M | YE25 cash $884.5M');
+  text.push('');
+  text.push('VERDICT: HOLD — SPECULATIVE / RISK-BUDGET');
+  text.push('Catalyst: Investor Day at NYSE on June 1, 2026.');
+  text.push('');
+  text.push('Not investment advice.');
+  navigator.clipboard.writeText(text.join('\n')).then(()=>{
+    const btn = document.querySelector('.copy-btn');
+    btn.textContent = 'Copied';
+    btn.style.background = '#00e676';
+    btn.style.color = '#08090d';
+    btn.style.borderColor = '#00e676';
+    setTimeout(()=>{
+      btn.textContent = 'Copy to Clipboard';
+      btn.style.background = '';
+      btn.style.color = '';
+      btn.style.borderColor = '';
+    }, 2000);
+  });
+}
+</script>
+
+</body>
+</html>
